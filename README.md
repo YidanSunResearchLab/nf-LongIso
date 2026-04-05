@@ -96,7 +96,6 @@ nextflow run main.nf \
 
 * **Pull fails?** Check your internet connection and ensure your Singularity/Apptainer version is up to date (≥ 3.8).
 * **Reference mismatch?** Ensure your FASTA and GTF are from the exact same assembly build.
-* **Memory/CPU errors?** Increase `--threads` or override resources in a custom config file (`-c my.config`).
 
 🛠 Maintenance and Support
 
@@ -118,7 +117,7 @@ While we aim to maintain long-term support for NextLongIso, development prioriti
 
 If you use NextLongIso in your work, please cite:
 * **This repository:** [https://github.com/YidanSunResearchLab/nf-LongIso.git](https://github.com/YidanSunResearchLab/nf-LongIso.git)
-* **The individual tools used within the pipeline:** Bambu, SUPPA2, IsoformSwitchAnalyzer, ProActiv, deeptools, DESeq2, bedtools, minimap2, etc.
+* **The individual tools used within the pipeline:** minimap2, samtools, deeptools, Bambu, SUPPA2, IsoformSwitchAnalyzer, ProActiv, DESeq2, bedtools, etc.
 
 ⚖️ License
 
