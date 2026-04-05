@@ -1,6 +1,6 @@
 # 🧬 NextLongIso: a comprehensive Nextflow pipeline for multi-dimensional long-read RNA-seq analysis
 
-NextLongIso is a modular Nextflow-based pipeline for streamlined, reproducible, and scalable analysis of long-read RNA-seq data (PacBio Iso-Seq and Oxford Nanopore). It integrates all major steps—from read alignment and bigWig generation to isoform quantification, alternative splicing, alternative 3' end processing (APA), alternative promoter usage, and transposable element (TE) analysis—using state-of-the-art tools.
+NextLongIso is a modular Nextflow pipeline for streamlined, reproducible, and scalable analysis of long-read RNA-seq data from PacBio Iso-Seq and Oxford Nanopore platforms. It integrates all major analysis steps,from read alignment and bigWig generation to isoform quantification, alternative splicing, alternative polyadenylation (APA), alternative promoter usage, and transposable element (TE) analysis, by using state-of-the-art tools and custom scripts.
 
 🧭 Workflow Overview
 
@@ -15,7 +15,7 @@ Figure 1. Overview of the NextLongIso pipeline, showing read alignment, isoform 
 * **End-to-end automation** of long-read RNA-seq analysis from FASTQ to results.
 * **Supports multiple platforms:** Fully compatible with both **PacBio** and **Nanopore** long-read data.
 * **Integrated analysis tools:** Utilizes minimap2, samtools, deeptools, Bambu, DESeq2, IsoformSwitchAnalyzer, SUPPA2, ProActiv, bedtools and custom scripts.
-* **Containerized environment:** Uses Singularity/Apptainer with pre-built images from Galaxy Depot.
+* **Containerized environment:** Uses Singularity/Apptainer with pre-built images from Docker Hub.
 * **Fully modular, reproducible, and scalable**—features overridable reference paths, making it ideal for large datasets and HPC environments.
 
 🧩 Installation
@@ -54,14 +54,6 @@ conda create -n nf-LongIso -c conda-forge python=3.13
 conda activate nf-LongIso
 pip install .
 ```
-
-4. Verify Installation
-
-```bash
-nf-longiso --help
-```
-
-If successful, usage instructions and command-line options will be displayed.
 
 
 🧪 Quick Start
