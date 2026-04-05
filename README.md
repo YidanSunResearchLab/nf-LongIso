@@ -84,8 +84,9 @@ Run the NextLongIso pipeline with your reference files:
 ```bash
 nextflow run main.nf \
   -profile singularity \
-  --fasta /Absolute/path/to/GRCh38.primary_assembly.fa.gz \
-  --gtf /Absolute/path/to/gencode.v47.annotation.gtf.gz \
+  --input_type fastq \
+  --genome /Absolute/path/to/GRCh38.primary_assembly.fa \
+  --gtf /Absolute/path/to/gencode.v47.annotation.gtf \
   --te_gtf /Absolute/path/to/TEtranscripts_hg38.gtf \
   --samplesheet /Absolute/path/to/samplesheet.csv \
   -resume
