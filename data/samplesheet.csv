@@ -1,0 +1,5 @@
+sample,fastq,condition
+GM12878_SRR10838647,/path/to/fastq/GM12878_SRR10838647.fastq.gz,control
+GM12878_SRR10838648,/path/to/fastq/GM12878_SRR10838648.fastq.gz,control
+H1_SRR22522144,/path/to/fastq/H1_SRR22522144.fastq.gz,treatment
+H1_SRR22522146,/path/to/fastq/H1_SRR22522146.fastq.gz,treatment
