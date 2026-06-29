@@ -8,7 +8,7 @@ Below is the schematic overview of the NextLongIso pipeline:
 
 ![Workflow Overview](data/figure.png)
 
-Figure 1. Overview of the NextLongIso pipeline, showing read alignment, isoform quantification, alternative promoter usage, APA, alternative splicing, and TE exonization/differential expression analysis.
+Figure 1. Overview of the NextLongIso pipeline, showing read alignment, isoform quantification, alternative promoter usage, APA, alternative splicing, and repeats (simple repeats and TE) exonization/differential expression analysis.
 
 ✳️ Key Features
 

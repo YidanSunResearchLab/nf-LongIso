@@ -15,7 +15,7 @@ params.outdir      = "results"
 // BASIC VALIDATION
 // ------------------------------------------------------------
 if (!params.samplesheet)
-    error "Please provide --samplesheet (CSV with sample,condition,fastq/bam)"
+    error "Please provide --samplesheet (CSV with sample,condition,fastq path)"
 
 if (!params.gtf)
     error "Please provide --gtf (Reference annotation)"
