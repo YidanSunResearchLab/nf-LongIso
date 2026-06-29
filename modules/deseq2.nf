@@ -52,7 +52,8 @@ process DESEQ2 {
     dds <- DESeqDataSetFromMatrix(countData = round(counts_data), colData = meta, design = design_formula)
 
     # 4. PCA
-    vsd <- vst(dds, blind=TRUE) 
+    vsd <- tryCatch(vst(dds, blind=TRUE),
+                error=function(e) varianceStabilizingTransformation(dds, blind=TRUE)) 
     pdf("pca_plot.pdf", width=7, height=5)
     if(ncol(dds) > 1){
         print(plotPCA(vsd, intgroup="condition") + theme_minimal())
@@ -157,7 +158,8 @@ process TE_DESEQ2 {
     write.csv(merge(te_meta_cols, te_nc, by="ID_JOIN"), "norm_counts_${type}.csv", row.names=FALSE)
 
     # 4. PCA
-    vsd <- vst(dds, blind=TRUE)[te_ids, ]
+    vsd <- tryCatch(vst(dds, blind=TRUE),
+                error=function(e) varianceStabilizingTransformation(dds, blind=TRUE))[te_ids, ]
     pdf("pca_${type}.pdf")
     if(ncol(dds) > 1) print(plotPCA(vsd, intgroup="condition")) else plot.new()
     dev.off()

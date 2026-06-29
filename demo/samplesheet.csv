@@ -1,0 +1,5 @@
+sample,fastq,condition
+GM12878_demo_rep1,demo/GM12878_demo_rep1.fastq.gz,control
+GM12878_demo_rep2,demo/GM12878_demo_rep2.fastq.gz,control
+H1_demo_rep1,demo/H1_demo_rep1.fastq.gz,treatment
+H1_demo_rep2,demo/H1_demo_rep2.fastq.gz,treatment
