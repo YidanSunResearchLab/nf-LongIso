@@ -60,7 +60,8 @@ You will need the Genome FASTA, Gene annotation GTF, and TE annotation GTF. Ensu
 *Important Note: Inconsistent chromosome naming (e.g., "chr1" in one file and "1" in another) is a common cause of pipeline failure. Always verify the first few lines of your files to ensure they match before starting.*
 
 **Step 2. Quick Start**
-#Navigate to the project directory and execute the pipeline using the command below. Note that the file paths are relative to the project root; ensure your reference files are correctly placed in the *data/genome/* directory.
+
+Navigate to the project directory and execute the pipeline using the command below. Note that the file paths are relative to the project root; ensure your reference files are correctly placed in the *data/genome/* directory.
 
 ```bash
 cd nf-LongIso
@@ -78,13 +79,14 @@ nextflow run main.nf \
 
 Understanding the Flags:
 -profile singularity: Tells Nextflow to use Singularity/Apptainer containers for reproducible environments; 
---input_type fastq: Specifies the format of your input data; 
--with-report resource_report.html: Generates a detailed report of the CPU and memory usage of each process; 
+--input_type: Specifies the format of your input data; 
+-with-report: Generates a detailed report of the CPU and memory usage of each process; 
 -resume: Enables the cache mechanism, allowing the pipeline to skip previously completed tasks if you need to rerun or fix a specific part. 
 
 *Note: During the first run, the pipeline will download required containers, which may take some time depending on your internet connection. We recommend using the -resume flag for all future executions; it intelligently tracks progress and reuses successful results, drastically reducing runtime.*
 
-**Output Directory
+**Output Directory**
+
 After a successful run, NextLongIso generates the following output directories and representative files.
 
 | Output folder  | Output files                                                                                                                                                                                          | Description                                                                                                                                                         |
