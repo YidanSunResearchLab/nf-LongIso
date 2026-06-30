@@ -50,11 +50,21 @@ cd nf-LongIso
 ```bash
 mkdir -p data/genome
 cd data/genome
+
+wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_47/GRCh38.primary_assembly.genome.fa.gz
+
+gunzip GRCh38.primary_assembly.genome.fa.gz
+
+wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_47/gencode.v47.annotation.gtf.gz
+
+gunzip gencode.v47.annotation.gtf.gz
+
+wget https://zenodo.org/records/21074209/files/TEtranscript_hg38_rmsk_TE.gtf?download=1
 ```
-You will need the Genome FASTA, Gene annotation GTF, and TE annotation GTF. Ensure your fasta and gtf are from the same assembly (e.g., GRCh38.p14 → Gencode v38+).
+You will need the Genome FASTA, Gene annotation GTF, and TE annotation GTF. Ensure your fasta and gtf are from the same assembly.
 * **Genome FASTA:** Download from Ensembl or UCSC (primary assembly).
 * **Gene GTF:** Download from Gencode (v47 or newer).
-* **TE GTF:** Download from the RepeatMasker or generate from the UCSC Table Browser (hg38 → Repeats → RepeatMasker → GTF output). Ensure the assembly version matches your Gene GTF and that chromosome nomenclature (e.g., chr1 vs 1) is consistent across all files.
+* **TE GTF:** Download from the RepeatMasker (https://www.repeatmasker.org/) or generate from the UCSC Table Browser (https://genome.ucsc.edu/cgi-bin/hgTables?hgsid=4105313869_RcAnJvPCP00P9TQImIQTYZR0qr7U&db=hg38&hgta_group=rep&hgta_track=knownGene&hgta_table=0&hgta_regionType=genome&position=chr7%3A155%2C799%2C529-155%2C812%2C871&hgta_outputType=gff&hgta_outFileName=). Ensure the assembly version matches your Gene GTF and that chromosome nomenclature (e.g., chr1 vs 1) is consistent across all files.
 
 *Important Note: Inconsistent chromosome naming (e.g., "chr1" in one file and "1" in another) is a common cause of pipeline failure. Always verify the first few lines of your files to ensure they match before starting.*
 
@@ -69,20 +79,20 @@ nextflow run main.nf \
   -profile singularity \
   --input_type fastq \
   -with-report resource_report.html \
-  --genome data/genome/GRCh38.genome.fa \
-  --gtf data/genome/gencode.annotation.gtf \
+  --genome data/genome/GRCh38.primary_assembly.genome.fa \
+  --gtf data/genome/gencode.v47.annotation.gtf \
   --te_gtf data/genome/TEtranscript_hg38_rmsk_TE.gtf \
   --samplesheet demo/samplesheet.csv \
   -resume
 ```
 
 Understanding the Flags:
-**-profile singularity**: Uses Singularity/Apptainer containers to ensure software reproducibility; 
-**--input_type**: Defines the data format (fastq); 
-**-with-report**: Generates an HTML report showing execution metrics (CPU/RAM); 
-**-resume**: This allows the pipeline to pick up exactly where it left off if a run is interrupted;
-**--genome**, **--gtf**, **--te_gtf**: Paths to the required reference files;
-**--samplesheet**: Path to the input CSV file that specifies the location of your input files (e.g., fastq).
+**-profile singularity**: Uses Singularity/Apptainer containers to ensure software reproducibility \
+**--input_type**: Defines the data format (fastq) \ 
+**-with-report**: Generates an HTML report showing execution metrics (CPU/RAM) \
+**-resume**: This allows the pipeline to pick up exactly where it left off if a run is interrupted \
+**--genome**, **--gtf**, **--te_gtf**: Paths to the required reference files \ 
+**--samplesheet**: Path to the input CSV file that specifies the location of your input files (e.g., fastq) \
 
 **Note**: During the first run, the pipeline will download required containers, which may take some time depending on your internet connection. We recommend using the -resume flag for all future executions, it intelligently tracks progress and reuses successful results, drastically reducing runtime.
 
