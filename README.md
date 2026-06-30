@@ -2,7 +2,7 @@
 
 NextLongIso is a modular Nextflow pipeline for streamlined, reproducible, and scalable analysis of long-read RNA-seq data from PacBio Iso-Seq and Oxford Nanopore platforms. It integrates all major analysis steps,from read alignment and bigWig generation to isoform quantification, alternative splicing, alternative polyadenylation (APA), alternative promoter usage, and repeated sequences (simple repeats and TE) analysis, by using state-of-the-art tools and custom scripts.
 
-🧭 Workflow Overview
+🧭 **Workflow Overview**
 
 Below is the schematic overview of the NextLongIso pipeline:
 
@@ -10,7 +10,7 @@ Below is the schematic overview of the NextLongIso pipeline:
 
 Figure 1. Overview of the NextLongIso pipeline, showing read alignment, isoform quantification, alternative promoter usage, APA, alternative splicing, and repeats (simple repeats and TE) exonization/differential expression analysis.
 
-✳️ Key Features
+✳️ **Key Features**
 
 * **End-to-end automation** of long-read RNA-seq analysis from FASTQ to results.
 * **Supports multiple platforms:** Fully compatible with both **PacBio** and **Nanopore** long-read data.
@@ -18,12 +18,11 @@ Figure 1. Overview of the NextLongIso pipeline, showing read alignment, isoform 
 * **Containerized environment:** Uses Singularity/Apptainer with pre-built images from Docker Hub.
 * **Fully modular, reproducible, and scalable**—features overridable reference paths, making it ideal for large datasets and HPC environments.
 
-🧩 Installation
+🧩 **Installation**
 
 To run NextLongIso, you need **Nextflow (≥ 25.10.0)** and **Apptainer** or **Singularity**. Internet access is required on the first run to pull containers (~several GB total).
 
-1. Environment Setup (Recommended)
-Use Conda to install the dependencies required to run the pipeline:
+**1. Environment Setup**: Use Conda to install the dependencies required to run the pipeline:
 
 ```bash
 # Create and activate environment
@@ -35,7 +34,7 @@ conda create -n nf-LongIso -c conda-forge -c bioconda \
     -y
 ```
 
-2. Pipeline Installation
+**2. Pipeline Installation**
 
 ```bash
 conda activate nf-LongIso
@@ -45,9 +44,9 @@ git clone https://github.com/YidanSunResearchLab/nf-LongIso.git
 cd nf-LongIso
 ```
 
-🚀 Quick Start for demo test
+🚀 **Quick Start for demo test**
 
-**Step 1. Prepare Reference Files (GRCh38/hg38 example)**
+**1. Prepare Reference Files (GRCh38/hg38 as example)**
 ```bash
 mkdir -p data/genome
 cd data/genome
@@ -59,7 +58,7 @@ You will need the Genome FASTA, Gene annotation GTF, and TE annotation GTF. Ensu
 
 *Important Note: Inconsistent chromosome naming (e.g., "chr1" in one file and "1" in another) is a common cause of pipeline failure. Always verify the first few lines of your files to ensure they match before starting.*
 
-**Step 2. Quick Start**
+**2. Quick Start**
 
 Navigate to the project directory and execute the pipeline using the command below. Note that the file paths are relative to the project root; ensure your reference files are correctly placed in the **data/genome/** directory.
 
@@ -78,12 +77,14 @@ nextflow run main.nf \
 ```
 
 Understanding the Flags:
-**-profile singularity**: Tells Nextflow to use Singularity/Apptainer containers for reproducible environments; 
-**--input_type**: Specifies the format of your input data; 
-**-with-report**: Generates a detailed report of the CPU and memory usage of each process; 
-**-resume**: Enables the cache mechanism, allowing the pipeline to skip previously completed tasks if you need to rerun or fix a specific part. 
+**-profile singularity**: Uses Singularity/Apptainer containers to ensure software reproducibility; 
+**--input_type**: Defines the data format (fastq); 
+**-with-report**: Generates an HTML report showing execution metrics (CPU/RAM); 
+**-resume**: Highly Recommended. This allows the pipeline to pick up exactly where it left off if a run is interrupted;
+**--genome**, **--gtf**, **--te_gtf**: Paths to the required reference files;
+**--samplesheet**: Path to the input CSV file.
 
-*Note: During the first run, the pipeline will download required containers, which may take some time depending on your internet connection. We recommend using the -resume flag for all future executions, it intelligently tracks progress and reuses successful results, drastically reducing runtime.*
+**Note**: During the first run, the pipeline will download required containers, which may take some time depending on your internet connection. We recommend using the -resume flag for all future executions, it intelligently tracks progress and reuses successful results, drastically reducing runtime.*
 
 **Output Directory**
 
@@ -105,12 +106,12 @@ After a successful run, NextLongIso generates the following output directories a
 | **multiqc/**   | `multiqc_report.html`                                                                                                                                                                                 | Integrated quality control report summarizing the entire workflow.                                                                                                  |
 
 
-💡 Troubleshooting
+💡 **Troubleshooting**
 
 * **Pull fails?** Check your internet connection and ensure your Singularity/Apptainer version is up to date (≥ 3.8).
 * **Reference mismatch?** Ensure your FASTA and GTF are from the exact same assembly build.
 
-🛠 Maintenance and Support
+🛠 **Maintenance and Support**
 
 NextLongIso is actively maintained by the Sun Lab. We are committed to maintaining and improving the software.
 Maintenance activities include:
@@ -126,12 +127,12 @@ We also welcome community contributions. Users are encouraged to:
 
 While we aim to maintain long-term support for NextLongIso, development priorities may evolve as the software and research needs grow.
 
-🧾 Citation
+🧾 **Citation**
 
 If you use NextLongIso in your work, please cite:
 * **This repository:** [https://github.com/YidanSunResearchLab/nf-LongIso.git](https://github.com/YidanSunResearchLab/nf-LongIso.git)
 * **The individual tools used within the pipeline:** minimap2, samtools, deeptools, Bambu, SUPPA2, IsoformSwitchAnalyzer, ProActiv, DESeq2, bedtools, etc.
 
-⚖️ License
+⚖️ **License**
 
 MIT LICENSE.
