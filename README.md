@@ -82,9 +82,9 @@ Understanding the Flags:
 **-with-report**: Generates an HTML report showing execution metrics (CPU/RAM); 
 **-resume**: Highly Recommended. This allows the pipeline to pick up exactly where it left off if a run is interrupted;
 **--genome**, **--gtf**, **--te_gtf**: Paths to the required reference files;
-**--samplesheet**: Path to the input CSV file.
+**--samplesheet**: Path to the input CSV file that specifies the location of your input files (e.g., fastq).
 
-**Note**: During the first run, the pipeline will download required containers, which may take some time depending on your internet connection. We recommend using the -resume flag for all future executions, it intelligently tracks progress and reuses successful results, drastically reducing runtime.*
+**Note**: During the first run, the pipeline will download required containers, which may take some time depending on your internet connection. We recommend using the -resume flag for all future executions, it intelligently tracks progress and reuses successful results, drastically reducing runtime.
 
 **Output Directory**
 
