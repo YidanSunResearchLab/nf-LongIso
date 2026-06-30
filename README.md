@@ -20,7 +20,7 @@ Figure 1. Overview of the NextLongIso pipeline, showing read alignment, isoform 
 
 🧩 Installation
 
-To run NextLongIso, you need **Nextflow (≥ 25.10.0)** and **Apptainer** or **Singularity. Internet access is required on the first run to pull containers (~several GB total).
+To run NextLongIso, you need **Nextflow (≥ 25.10.0)** and **Apptainer** or **Singularity**. Internet access is required on the first run to pull containers (~several GB total).
 
 1. Environment Setup (Recommended)
 Use Conda to install the dependencies required to run the pipeline:
@@ -56,10 +56,11 @@ You will need the Genome FASTA, Gene annotation GTF, and TE annotation GTF. Ensu
 * **Genome FASTA:** Download from Ensembl or UCSC (primary assembly).
 * **Gene GTF:** Download from Gencode (v47 or newer).
 * **TE GTF:** Download from the RepeatMasker or generate from the UCSC Table Browser (hg38 → Repeats → RepeatMasker → GTF output). Ensure the assembly version matches your Gene GTF and that chromosome nomenclature (e.g., chr1 vs 1) is consistent across all files.
+
 *Important Note: Inconsistent chromosome naming (e.g., "chr1" in one file and "1" in another) is a common cause of pipeline failure. Always verify the first few lines of your files to ensure they match before starting.*
 
 **Step 2. Quick Start**
-#Navigate to the project directory and execute the pipeline using the command below. Note that the file paths are relative to the project root; ensure your reference files are correctly placed in the data/genome/ directory.
+#Navigate to the project directory and execute the pipeline using the command below. Note that the file paths are relative to the project root; ensure your reference files are correctly placed in the *data/genome/* directory.
 
 ```bash
 cd nf-LongIso
@@ -80,6 +81,7 @@ Understanding the Flags:
 --input_type fastq: Specifies the format of your input data; 
 -with-report resource_report.html: Generates a detailed report of the CPU and memory usage of each process; 
 -resume: Enables the cache mechanism, allowing the pipeline to skip previously completed tasks if you need to rerun or fix a specific part. 
+
 *Note: During the first run, the pipeline will download required containers, which may take some time depending on your internet connection. We recommend using the -resume flag for all future executions; it intelligently tracks progress and reuses successful results, drastically reducing runtime.*
 
 **Output Directory
