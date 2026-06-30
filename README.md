@@ -61,7 +61,7 @@ You will need the Genome FASTA, Gene annotation GTF, and TE annotation GTF. Ensu
 
 **Step 2. Quick Start**
 
-Navigate to the project directory and execute the pipeline using the command below. Note that the file paths are relative to the project root; ensure your reference files are correctly placed in the *data/genome/* directory.
+Navigate to the project directory and execute the pipeline using the command below. Note that the file paths are relative to the project root; ensure your reference files are correctly placed in the **data/genome/** directory.
 
 ```bash
 cd nf-LongIso
@@ -78,12 +78,12 @@ nextflow run main.nf \
 ```
 
 Understanding the Flags:
--profile singularity: Tells Nextflow to use Singularity/Apptainer containers for reproducible environments; 
---input_type: Specifies the format of your input data; 
--with-report: Generates a detailed report of the CPU and memory usage of each process; 
--resume: Enables the cache mechanism, allowing the pipeline to skip previously completed tasks if you need to rerun or fix a specific part. 
+**-profile singularity**: Tells Nextflow to use Singularity/Apptainer containers for reproducible environments; 
+**--input_type**: Specifies the format of your input data; 
+**-with-report**: Generates a detailed report of the CPU and memory usage of each process; 
+**-resume**: Enables the cache mechanism, allowing the pipeline to skip previously completed tasks if you need to rerun or fix a specific part. 
 
-*Note: During the first run, the pipeline will download required containers, which may take some time depending on your internet connection. We recommend using the -resume flag for all future executions; it intelligently tracks progress and reuses successful results, drastically reducing runtime.*
+*Note: During the first run, the pipeline will download required containers, which may take some time depending on your internet connection. We recommend using the -resume flag for all future executions, it intelligently tracks progress and reuses successful results, drastically reducing runtime.*
 
 **Output Directory**
 
@@ -103,6 +103,7 @@ After a successful run, NextLongIso generates the following output directories a
 | **TE/**        | `isoform_TE_exonization.tsv`, `TE_family_counts.tsv`, `TE_instance_counts.tsv`                                                                                                                        | Transposable element exonization events and TE expression quantification.                                                                                           |
 | **TE/DE/**     | `DE_TE_Family_results.csv`, `DE_TE_Instance_results.csv`                                                                                                                               | Differential expression analysis of TE families and individual TE instances.                                                                                        |
 | **multiqc/**   | `multiqc_report.html`                                                                                                                                                                                 | Integrated quality control report summarizing the entire workflow.                                                                                                  |
+
 
 💡 Troubleshooting
 
