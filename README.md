@@ -22,76 +22,65 @@ Figure 1. Overview of the NextLongIso pipeline, showing read alignment, isoform 
 
 To run NextLongIso, you need **Nextflow (≥ 25.10.0)** and **Apptainer** or **Singularity. Internet access is required on the first run to pull containers (~several GB total).
 
-1. Install via Conda (Recommended). Note that Python versions 3.11 - 3.13 are natively supported.
+1. Environment Setup (Recommended)
+Use Conda to install the dependencies required to run the pipeline:
 
 ```bash
 # Create and activate environment
-conda create -n nf-LongIso \
-    nf-longiso \
-    nextflow \
+conda create -n nf-LongIso -c conda-forge -c bioconda \
+    nextflow=25.10.0 \
     apptainer \
     openjdk=17 \
     graphviz \
-    -y \
-    -c conda-forge \
-    -c bioconda \
-    -c defaults
+    -y
+```
+
+2. Pipeline Installation
+
+```bash
 conda activate nf-LongIso
-```
 
-2. Install via Pip
-
-```bash
-pip install --user --no-cache-dir nf-LongIso
-```
-
-3. Manual Installation (Build from Source)
-
-```bash
 git clone https://github.com/YidanSunResearchLab/nf-LongIso.git
-cd nf-LongIso
-conda create -n nf-LongIso -c conda-forge python=3.13
-conda activate nf-LongIso
-pip install .
-```
 
-
-🧪 Quick Start
-
-**1. Clone the Repository**
-
-```bash
-git clone https://github.com/YidanSunResearchLab/nf-LongIso.git
 cd nf-LongIso
 ```
 
-**2. Prepare your samplesheet**
-See the example `samplesheet.csv` provided in the data/ repository for the expected format.
-
-🚀 Quick Start for your own genome and sequencing data
+🚀 Quick Start for demo test
 
 **Step 1. Prepare Reference Files (GRCh38/hg38 example)**
-
+```bash
+mkdir -p data/genome
+cd data/genome
+```
 You will need the Genome FASTA, Gene annotation GTF, and TE annotation GTF. Ensure your fasta and gtf are from the same assembly (e.g., GRCh38.p14 → Gencode v38+).
 * **Genome FASTA:** Download from Ensembl or UCSC (primary assembly).
 * **Gene GTF:** Download from Gencode (v47 or newer).
-* **TE GTF:** Download from the RepeatMasker or generate from the UCSC Table Browser (hg38 → Repeats → RepeatMasker → GTF output).
+* **TE GTF:** Download from the RepeatMasker or generate from the UCSC Table Browser (hg38 → Repeats → RepeatMasker → GTF output). Ensure the assembly version matches your Gene GTF and that chromosome nomenclature (e.g., chr1 vs 1) is consistent across all files.
+*Important Note: Inconsistent chromosome naming (e.g., "chr1" in one file and "1" in another) is a common cause of pipeline failure. Always verify the first few lines of your files to ensure they match before starting.*
 
-**Step 2. Process Long-Read Data**
-
-Run the NextLongIso pipeline with your reference files:
+**Step 2. Quick Start**
+#Navigate to the project directory and execute the pipeline using the command below. Note that the file paths are relative to the project root; ensure your reference files are correctly placed in the data/genome/ directory.
 
 ```bash
+cd nf-LongIso
+
 nextflow run main.nf \
   -profile singularity \
   --input_type fastq \
-  --genome /Absolute/path/to/GRCh38.primary_assembly.fa \
-  --gtf /Absolute/path/to/gencode.v47.annotation.gtf \
-  --te_gtf /Absolute/path/to/TEtranscripts_hg38.gtf \
-  --samplesheet /Absolute/path/to/samplesheet.csv \
+  -with-report resource_report.html \
+  --genome data/genome/GRCh38.genome.fa \
+  --gtf data/genome/gencode.annotation.gtf \
+  --te_gtf data/genome/TEtranscript_hg38_rmsk_TE.gtf \
+  --samplesheet demo/samplesheet.csv \
   -resume
 ```
-*Note: The `-resume` flag reuses previous computations if nothing changed, saving significant time.*
+
+Understanding the Flags:
+-profile singularity: Tells Nextflow to use Singularity/Apptainer containers for reproducible environments; 
+--input_type fastq: Specifies the format of your input data; 
+-with-report resource_report.html: Generates a detailed report of the CPU and memory usage of each process; 
+-resume: Enables the cache mechanism, allowing the pipeline to skip previously completed tasks if you need to rerun or fix a specific part. 
+*Note: During the first run, the pipeline will download required containers, which may take some time depending on your internet connection. We recommend using the -resume flag for all future executions; it intelligently tracks progress and reuses successful results, drastically reducing runtime.*
 
 **Output Directory
 After a successful run, NextLongIso generates the following output directories and representative files.
