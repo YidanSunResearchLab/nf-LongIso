@@ -61,12 +61,8 @@ gunzip gencode.v47.annotation.gtf.gz
 
 wget -O TEtranscript_hg38_rmsk_TE.gtf "https://zenodo.org/records/21074209/files/TEtranscript_hg38_rmsk_TE.gtf?download=1"
 ```
-You will need the Genome FASTA, Gene annotation GTF, and TE annotation GTF. Ensure your fasta and gtf are from the same assembly.
-* **Genome FASTA:** Download from Ensembl or UCSC (primary assembly).
-* **Gene GTF:** Download from Gencode (v47 or newer).
-* **TE GTF:** Download from the RepeatMasker (https://www.repeatmasker.org/) or generate from the UCSC Table Browser (https://genome.ucsc.edu/cgi-bin/hgTables?hgsid=4105313869_RcAnJvPCP00P9TQImIQTYZR0qr7U&db=hg38&hgta_group=rep&hgta_track=knownGene&hgta_table=0&hgta_regionType=genome&position=chr7%3A155%2C799%2C529-155%2C812%2C871&hgta_outputType=gff&hgta_outFileName=). Ensure the assembly version matches your Gene GTF and that chromosome nomenclature (e.g., chr1 vs 1) is consistent across all files.
 
-*Important Note: Inconsistent chromosome naming (e.g., "chr1" in one file and "1" in another) is a common cause of pipeline failure. Always verify the first few lines of your files to ensure they match before starting.*
+**Important Note**: If you choose to use your own Genome FASTA or GTF files, ensure they all originate from the same genome assembly (e.g., GRCh38/hg38). Additionally, chromosome nomenclature must be consistent across all files (e.g., ensure all files use chr1 consistently rather than mixing chr1 and 1). Mismatched assembly versions or inconsistent naming conventions are the most frequent causes of pipeline failure. We recommend inspecting the file headers before starting to verify that these attributes align.
 
 **2. Start**
 
