@@ -58,7 +58,7 @@ You will need the Genome FASTA, Gene annotation GTF, and TE annotation GTF. Ensu
 
 *Important Note: Inconsistent chromosome naming (e.g., "chr1" in one file and "1" in another) is a common cause of pipeline failure. Always verify the first few lines of your files to ensure they match before starting.*
 
-**2. Quick Start**
+**2. Start**
 
 Navigate to the project directory and execute the pipeline using the command below. Note that the file paths are relative to the project root; ensure your reference files are correctly placed in the **data/genome/** directory.
 
@@ -80,13 +80,13 @@ Understanding the Flags:
 **-profile singularity**: Uses Singularity/Apptainer containers to ensure software reproducibility; 
 **--input_type**: Defines the data format (fastq); 
 **-with-report**: Generates an HTML report showing execution metrics (CPU/RAM); 
-**-resume**: Highly Recommended. This allows the pipeline to pick up exactly where it left off if a run is interrupted;
+**-resume**: This allows the pipeline to pick up exactly where it left off if a run is interrupted;
 **--genome**, **--gtf**, **--te_gtf**: Paths to the required reference files;
 **--samplesheet**: Path to the input CSV file that specifies the location of your input files (e.g., fastq).
 
 **Note**: During the first run, the pipeline will download required containers, which may take some time depending on your internet connection. We recommend using the -resume flag for all future executions, it intelligently tracks progress and reuses successful results, drastically reducing runtime.
 
-**Output Directory**
+**3. Output**
 
 After a successful run, NextLongIso generates the following output directories and representative files.
 
@@ -105,6 +105,7 @@ After a successful run, NextLongIso generates the following output directories a
 | **TE/DE/**     | `DE_TE_Family_results.csv`, `DE_TE_Instance_results.csv`                                                                                                                               | Differential expression analysis of TE families and individual TE instances.                                                                                        |
 | **multiqc/**   | `multiqc_report.html`                                                                                                                                                                                 | Integrated quality control report summarizing the entire workflow.                                                                                                  |
 
+**Note**:Some output files (e.g., isoform_TE_exonization.tsv) may not be generated if the corresponding biological events are not detected in your dataset.
 
 💡 **Troubleshooting**
 
