@@ -14,18 +14,29 @@ process MAKE_DESIGN {
     val reference       // reference condition
 
     output:
-    path "design.csv", emit: csv
+    path "design.csv"  , emit: csv
+    path "versions.yml", emit: versions
 
     script:
     def quoted = lines.collect { r -> "'${r}'" }.join(' ')
     """
     printf '%s\\n' ${quoted} > design.csv
     check_design.R --design=design.csv --design-formula='${params.design}' --reference=${reference}
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        r-base: \$(Rscript -e 'cat(as.character(getRversion()))')
+        bioconductor-deseq2: \$(Rscript -e 'cat(as.character(packageVersion("DESeq2")))')
+    END_VERSIONS
     """
 
     stub:
     def quoted = lines.collect { r -> "'${r}'" }.join(' ')
     """
     printf '%s\\n' ${quoted} > design.csv
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
+    END_VERSIONS
     """
 }

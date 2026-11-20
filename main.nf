@@ -134,7 +134,9 @@ workflow {
     // Normalised design table (sample,condition) used by all R steps
     def design_lines = [ (['sample', 'condition'] + covariates).join(',') ] +
         samples.collect { s -> ([ s[0].id, s[0].condition ] + covariates.collect { c -> s[0].covariates[c] }).join(',') }
-    ch_design = MAKE_DESIGN(design_lines, reference).csv
+    MAKE_DESIGN(design_lines, reference)
+    ch_design   = MAKE_DESIGN.out.csv
+    ch_versions = ch_versions.mix(MAKE_DESIGN.out.versions)
 
     // 2. ALIGNMENT (FASTQ) OR BAM PREPARATION
     if (params.input_type == 'fastq') {

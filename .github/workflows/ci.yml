@@ -1,6 +1,6 @@
 name: CI
 
-# push / pull_request: schema checks, lint, TE unit test and a stub run of the test profile
+# push / pull_request: schema checks, lint, TE and APA unit tests and stub runs of the test profile
 # workflow_dispatch:   a real run of the test profile (tiny dataset in tests/data)
 
 on:
@@ -61,8 +61,20 @@ jobs:
           docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:$PWD" -w "$PWD" \
             quay.io/biocontainers/bedtools:2.31.1--h13024bc_3 sh tests/te_unit/run_te_unit_test.sh
 
+      - name: APA unit test (internal priming and PAS clustering, IsoformSwitchAnalyzeR container)
+        run: |
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:$PWD" -w "$PWD" \
+            quay.io/biocontainers/bioconductor-isoformswitchanalyzer:2.6.0--r44h3df3fcb_0 sh tests/apa_unit/run_apa_unit_test.sh
+
       - name: Stub run (-profile test,docker -stub)
         run: nextflow run main.nf -profile test,docker -stub --outdir results_stub
+
+      - name: Stub run with SQANTI3 and a design covariate
+        run: |
+          nextflow run main.nf -profile test,docker -stub --outdir results_stub_cov \
+            --samplesheet tests/samplesheet_test_covariates.csv --design '~ batch + condition' --run_sqanti3
+          test -s results_stub_cov/sqanti3/sqanti3_category_counts.tsv
+          test -s results_stub_cov/suppa2/diffsplice/suppa2_diffsplice_significant.tsv
 
   test:
     name: Real run of the test profile

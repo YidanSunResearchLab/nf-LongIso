@@ -150,6 +150,7 @@ A CSV file with a header line and one row per sample:
 | `condition` | yes | Biological condition / group |
 | `fastq` | with `--input_type fastq` | FASTQ file (`.fastq`, `.fq`, optionally `.gz`) |
 | `bam` | with `--input_type bam` | Coordinate-sorted BAM file |
+| *other columns* | no | Covariates such as `batch` or `sex`, used when named in `--design` (see **Experimental design and covariates**) |
 
 ```csv
 sample,fastq,condition
@@ -162,7 +163,7 @@ H1_rep2,demo/H1_demo_rep2.fastq.gz,treatment
 Rules (checked before the run starts):
 * `sample` and `condition` must start with a letter and contain only letters, digits and underscores (`^[A-Za-z][A-Za-z0-9_]*$`). Dots and hyphens are not allowed because R and DESeq2 silently rewrite such names, which breaks the matching between count tables and samples.
 * Sample names must be unique, and every input file must exist. Relative paths are resolved from the directory where you start Nextflow.
-* Conditions with fewer than 2 replicates produce a warning; isoform-switch testing skips them.
+* Conditions with fewer than 2 replicates produce a warning; isoform-switch testing and SUPPA2 diffSplice skip them.
 * **Reference condition:** all comparisons are made against `--reference_condition`. If it is not set, `control` is used when present, otherwise the alphabetically first condition. The log shows which one was used.
 * **BAM input** (`--input_type bam`): BAMs must be coordinate-sorted. A BAM index (`<file>.bam.bai` or `<file>.bai`) is used when present and created otherwise. Each BAM is renamed to `<sample>.sorted.bam` inside the pipeline, so all result tables use the sample names. Alignment statistics, junctions and bigWigs are produced exactly as for FASTQ input. `--genome` is still required (Bambu uses it).
 
@@ -180,11 +181,18 @@ Extra options are **appended after** the pipeline's own options, so you can add 
 | `--bamcoverage_args` | *(empty)* | deepTools bamCoverage | Appended after `--binSize 5 --minMappingQuality 5 --normalizeUsing CPM --skipNonCoveredRegions` |
 | `--bambu_args` | *(empty)* | Bambu | Extra R arguments for `bambu()`, e.g. `NDR = 0.1` |
 | `--suppa2_events` | `SE SS MX RI FL` | SUPPA2 generateEvents | Event types |
-| `--reference_condition` | *(auto)* | DESeq2, TE DESeq2, IsoformSwitchAnalyzeR, proActiv | Reference group (see Samplesheet) |
-| `--isoswitch_alpha` | `0.05` | IsoformSwitchAnalyzeR | q-value cutoff for switches and APA sites |
+| `--suppa2_diff_args` | `-m empirical -gc` | SUPPA2 diffSplice | See **Differential splicing (SUPPA2)** |
+| `--sqanti3_args` | *(empty)* | SQANTI3 QC | Extra `sqanti3_qc.py` options (see **SQANTI3**) |
+| `--design` | `~ condition` | all differential analyses | Design formula over samplesheet columns (see **Experimental design and covariates**) |
+| `--reference_condition` | *(auto)* | all differential analyses | Reference group (see Samplesheet) |
+| `--isoswitch_alpha` | `0.05` | IsoformSwitchAnalyzeR | q-value cutoff for isoform switches |
 | `--isoswitch_dif_cutoff` | `0.1` | IsoformSwitchAnalyzeR | Minimum \|dIF\| for `significant_switches.csv` |
-| `--seed` | `42` | APA test | Random seed for simulated Fisher p-values |
-| `--proactiv_species` | `Homo_sapiens` | proActiv | Species for the standard-chromosome filter (see below) |
+| `--isoswitch_consequences`, `--isoswitch_n_plots` | `true`, `10` | IsoformSwitchAnalyzeR | See **Isoform switch consequences** |
+| `--usage_alpha` | `0.05` | DEXSeq (APA, promoters) | Gene-level q-value cutoff for differential PAS and promoter usage |
+| `--junction_min_mapq` | `0` | junction extraction | See **Junctions** |
+| `--apa_*`, `--promoter_*`, `--tss_*` | | APA, promoter usage | See **Alternative polyadenylation (APA)** and **Promoter usage** |
+| `--skip_read_qc`, `--run_sqanti3` | `false`, `false` | read QC, SQANTI3 | See **Read QC** and **SQANTI3** |
+| `--proactiv_species` | `Homo_sapiens` | proActiv (`--promoter_method proactiv`) | Species for the standard-chromosome filter (see below) |
 | `--proactiv_altprom_args` | `minAbs = 0.25, minRel = 0.05, maxPval = 0.05, promoterFC = 2.0, geneFC = 1.5` | proActiv `getAlternativePromoters()` | Thresholds for alternative promoters |
 | `--te_count_mode`, `--te_min_overlap`, `--te_strand`, `--te_autonomous_frac` | `exon`, `20`, `sense`, `0.5` | TE analysis | See **TE quantification modes** |
 
@@ -226,6 +234,67 @@ nextflow run main.nf -profile singularity -c custom.config --samplesheet samples
 * `--bambu_args` is inserted into R code: use double quotes for R strings (e.g. `--bambu_args='opt.discovery = list(prefix = "Tx")'`); single quotes are rejected. Do not repeat arguments that the pipeline already sets (`reads`, `annotations`, `genome`, `ncore`, `discovery`, `quant`, `lowMemory`, `verbose`).
 * To use alignments made with your own settings, start from BAM files with `--input_type bam`.
 
+🧪 **Experimental design and covariates**
+
+All differential analyses (DESeq2 for genes, transcripts and TEs, IsoformSwitchAnalyzeR, and the DEXSeq usage tests for APA and promoters) use the design formula `--design` (default `~ condition`). Covariates are extra samplesheet columns named in the formula, with `condition` as the last term:
+
+```csv
+sample,fastq,condition,batch
+GM12878_rep1,reads/GM12878_rep1.fastq.gz,control,b1
+GM12878_rep2,reads/GM12878_rep2.fastq.gz,control,b2
+H1_rep1,reads/H1_rep1.fastq.gz,treatment,b1
+H1_rep2,reads/H1_rep2.fastq.gz,treatment,b2
+```
+
+```bash
+nextflow run main.nf -profile singularity --samplesheet samplesheet.csv --design '~ batch + condition' ...
+```
+
+* Covariates are categorical (factors). Their values follow the naming rule of conditions, and a column with a single value is rejected.
+* The design matrix is checked before alignment starts: a confounded design (e.g. every `treatment` sample in one batch) stops the run with a message naming the samplesheet columns involved.
+* DESeq2 and IsoformSwitchAnalyzeR use the formula directly. The DEXSeq usage tests use `~ sample + exon + <covariate>:exon + condition:exon` against `~ sample + exon + <covariate>:exon`.
+* SUPPA2 diffSplice and proActiv's `getAlternativePromoters()` do not model covariates; a warning is printed when covariates are set.
+
+🔗 **Junctions**
+
+Splice junctions are extracted from every sample's primary alignments (`samtools view -F 2308`, MAPQ ≥ `--junction_min_mapq`, default 0). The junction strand comes from the minimap2 `ts` tag (transcript strand relative to the read, combined with the alignment strand), or from `XS` when present; junctions without either tag get strand `.`. `junctions/<sample>.junctions.bed` (BED6; score = min(reads, 1000)) and `junctions/<sample>.junctions.tsv` (chr, start, end, strand, reads, motif, annotated) use 0-based, end-exclusive intron coordinates. `motif` is the intron's dinucleotide pair in transcript orientation (`GT-AG`, `GC-AG`, `AT-AC` or `non-canonical`; for strand `.`, the orientation that gives a canonical motif) and `annotated` tells whether the intron is in `--gtf`. The TE analysis only uses junctions on the transcript's strand or with unknown strand (`.`).
+
+📍 **Alternative polyadenylation (APA)**
+
+`apa/` replaces the v0.1.0 APA output of IsoformSwitchAnalyzeR (`isoswitch/APA_gene_summary.csv`, `clustered_base_level_PAS_usage.csv`, which used scaled isoform fractions and a Fisher test without replicates).
+
+1. **PAS sites.** The 3' ends of the Bambu transcripts are clustered per gene and strand: ends closer than `--apa_cluster_window` (25 bp) join a cluster, and clusters are split so that no cluster is wider than `--apa_max_cluster_width` (50 bp).
+2. **Internal priming.** The 3' end of a novel transcript is flagged when the 20 nt downstream are ≥ `--apa_ip_a_frac` (0.7) A or contain a run of 6 A, unless an annotated 3' end lies within 50 bp or a poly(A) signal hexamer (AATAAA, ATTAAA and 10 variants) lies 10–40 nt upstream. Flagged ends are removed (`--apa_internal_priming filter`, default) or kept and marked (`flag`). Annotated ends are never removed.
+3. **Usage test.** PAS read counts (Bambu transcript counts summed per cluster; clusters with < `--apa_min_count` reads are removed) are tested with DEXSeq for each condition vs the reference, with the design covariates. Genes with gene-level q < `--usage_alpha` have differential PAS usage.
+
+Outputs: `pas_transcripts.tsv` (every transcript end with its A content, PAS signal and filter decision), `pas_annotation.tsv`, `pas_counts.tsv`, `apa_dexseq_results.tsv` (per PAS: padj, gene q, PAS usage per sample and condition, dPAU) and `APA_gene_summary.csv` (per gene: top PAS, `pas_shift_bp` = change of the usage-weighted mean PAS position in transcription direction, `direction` distal/proximal). Method comparison with v0.1.0: `docs/dev/apa_method_comparison.md`.
+
+🚦 **Promoter usage**
+
+`--promoter_method tss` (default) defines promoters from the Bambu transcripts' 5' ends, clustered per gene and strand (`--tss_cluster_window` 50 bp, maximal width `--tss_max_cluster_width` 100 bp), so single-exon transcripts and novel TSSs are included. Promoter counts are the Bambu counts of the transcripts starting in each cluster. Activity follows proActiv: absolute activity = log2(normalised count + 1) with DESeq2 size factors from the gene counts, relative activity = promoter count / gene count, and each promoter is Major (most active of its gene), Minor or Inactive (absolute activity < `--promoter_min_activity`, 0.25) per condition; internal promoters (inside another transcript of the gene) are classified too and flagged in `internal_promoter`. Differential promoter usage uses DEXSeq as for APA (`--promoter_min_count`, `--usage_alpha`).
+
+`--promoter_method proactiv` runs proActiv on junction files built from the BAMs, as in v0.1.0. proActiv quantifies a promoter from the reads of its first intron, so promoters of single-exon transcripts are never quantified (NA), and it does not model covariates.
+
+Outputs (`promoter/`): `promoter_annotation.tsv`, `promoter_counts.tsv`, `promoter_activity.tsv`, `promoter_dexseq_results.tsv` and `alternative_promoters.tsv` (promoters of genes with gene q < `--usage_alpha`); with `proactiv`: `promoter_activity.tsv`, `promoter_counts.tsv`, `alternative_promoters.tsv` in proActiv's format. ONT cDNA reads are often truncated at the 5' end, which can move or split TSS clusters; use CAGE data, where available, to confirm TSS-level results. Method comparison: `docs/dev/promoter_method_comparison.md`.
+
+🔀 **Isoform switch consequences**
+
+With `--isoswitch_consequences true` (default), transcript sequences are extracted from the Bambu annotation with gffread, IsoformSwitchAnalyzeR predicts ORFs (`analyzeORF`, longest ORF) and `analyzeSwitchConsequences` compares the up- and down-regulated isoforms of each significant switch for intron retention, ORF similarity, NMD status, TSS, TTS, last exon, isoform length and exon number. No BSgenome package is needed. Outputs in `isoswitch/`: `switch_consequences.csv`, `consequence_summary.csv/.pdf` (`extractConsequenceSummary`), `consequence_enrichment.csv/.pdf` (`extractConsequenceEnrichment`) and `switch_plots.pdf` (`switchPlot` of the top `--isoswitch_n_plots` switching genes, 10 by default). Without significant switches these files contain a message instead. External tools (CPC2, Pfam, SignalP, IUPred2A) are not run.
+
+✂️ **Differential splicing (SUPPA2)**
+
+SUPPA2 generates splicing events from the Bambu annotation and computes PSI per sample from the Bambu transcript counts. PSI is a ratio of transcript abundances within a gene, so PSI values from counts and from CPM are identical. With `--suppa2_diff true` (default), `suppa.py diffSplice` compares each non-reference condition with the reference (options `--suppa2_diff_args`, default `-m empirical -gc`; Bambu CPM values are passed as the transcript expression). It needs at least 2 replicates in both conditions; other conditions are skipped with a warning, and it does not model covariates.
+
+Outputs (`suppa2/diffsplice/`): `<condition>_vs_<reference>_<event type>.dpsi` (ΔPSI = condition − reference, p-value) and `.psivec` (PSI per sample), and `suppa2_diffsplice_significant.tsv` (all comparisons and event types, p < `--suppa2_alpha` 0.05 and |ΔPSI| > `--suppa2_dpsi_cutoff` 0.1). With few replicates the empirical method can report p = 0 for events with ΔPSI near 0; the |ΔPSI| cutoff removes them from the combined table.
+
+📊 **Read QC**
+
+For FASTQ input, NanoPlot (read length and quality distributions, interactive HTML) and `seqkit stats --all` (read number, N50, quality) run on every sample (`read_qc/nanoplot/<sample>/`, `read_qc/seqkit/<sample>.seqkit_stats.tsv`); both summaries are included in the MultiQC report. `--skip_read_qc` turns this off; with BAM input it is not run.
+
+🏷️ **SQANTI3**
+
+With `--run_sqanti3` (off by default), SQANTI3 QC (`sqanti3_qc.py` only; no filter or rescue) classifies every transcript of the Bambu annotation against `--gtf`. It uses the official container `anaconesalab/sqanti3:v6.0.1` (about 7.5 GB to download). Outputs (`sqanti3/`): `nextlongiso_classification.txt`, `nextlongiso_junctions.txt`, `nextlongiso_SQANTI3_report.html` and `sqanti3_category_counts.tsv` (number of transcripts per structural category: FSM, ISM, NIC, NNC, genic, antisense, fusion, intergenic, genic intron; all, annotated and novel transcripts). Extra options go in `--sqanti3_args` (e.g. `--sqanti3_args='--report skip'`; orthogonal data such as `--CAGE_peak` or `--polyA_motif_list` need paths that are visible inside the container). The test profile runs SQANTI3 only as a stub.
+
 🧬 **TE quantification modes**
 
 With `--te_gtf`, NextLongIso links Bambu isoforms to transposable elements (TEs) and quantifies TE-derived expression. Two counting modes are available:
@@ -265,16 +334,19 @@ After a successful run, NextLongIso generates the following output directories a
 | -------------- | ------------ | ----------- |
 | **minimap2/**  | `*.sorted.bam`, `*.sorted.bam.bai`, `*.sorted.bam.stats`, `*.sorted.bam.flagstat` | Sorted and indexed alignments (FASTQ input) and alignment statistics (both input types). SAM files are no longer written. |
 | **bigwig/**    | `*.bw` | BigWig coverage tracks for genome browser visualization (e.g., IGV, UCSC Genome Browser). |
-| **junctions/** | `*.junctions.bed` | Splice junctions observed in each sample. |
+| **read_qc/**   | `nanoplot/<sample>/`, `seqkit/<sample>.seqkit_stats.tsv` | Read QC (FASTQ input; see **Read QC**). |
+| **junctions/** | `*.junctions.bed`, `*.junctions.tsv` | Splice junctions per sample with strand, read count, motif and annotation status (see **Junctions**). |
 | **bambu/**     | `extended_annotations.gtf`, `counts_gene.txt`, `counts_transcript.txt`, `CPM_transcript.txt`, `bambu_annotations.rds`, `bambu_results.rds` | Transcript annotation, gene/transcript expression quantification, and Bambu objects. |
 | **DE_genes/**  | `DE_results.csv`, `normalized_counts.csv`, `pca_plot.pdf` | Gene-level differential expression (from `counts_gene.txt`). With more than two conditions: `DE_results_<condition>_vs_<reference>.csv`. |
 | **DE_transcripts/** | `DE_results.csv`, `normalized_counts.csv`, `pca_plot.pdf` | Transcript-level differential expression (from `counts_transcript.txt`). |
-| **isoswitch/** | `significant_switches.csv`, `isoform_switch_results.csv`, `atts_results.csv`, `atss_results.csv`, `all_AS_events.csv`, `APA_gene_summary.csv`, `clustered_base_level_PAS_usage.csv`, `switchlist.rds` | Isoform switches (q < `--isoswitch_alpha` and \|dIF\| > `--isoswitch_dif_cutoff`), alternative TSS/TTS, alternative splicing, and APA per comparison (`condition_1` = reference). |
-| **suppa2/**    | `events_A3/A5/AF/AL/MX/RI/SE_*.ioe`, `psi/` | Alternative splicing events and PSI (Percent Spliced In) values; `*_filtered.psi` keeps events with a PSI value in at least two samples. |
-| **proactiv/**  | `alternative_promoters.tsv`, `promoter_activity.tsv`, `promoter_counts.tsv` | Alternative promoters (relative to the reference condition), promoter activity and promoter counts. |
+| **isoswitch/** | `significant_switches.csv`, `isoform_switch_results.csv`, `atts_results.csv`, `atss_results.csv`, `all_AS_events.csv`, `switch_consequences.csv`, `consequence_summary.csv/.pdf`, `consequence_enrichment.csv/.pdf`, `switch_plots.pdf`, `switchlist.rds` | Isoform switches (q < `--isoswitch_alpha` and \|dIF\| > `--isoswitch_dif_cutoff`), alternative TSS/TTS, alternative splicing and switch consequences per comparison (`condition_1` = reference). |
+| **apa/**       | `pas_transcripts.tsv`, `pas_annotation.tsv`, `pas_counts.tsv`, `apa_dexseq_results.tsv`, `APA_gene_summary.csv` | Poly(A) sites and differential PAS usage (see **Alternative polyadenylation (APA)**). |
+| **promoter/**  | `promoter_annotation.tsv`, `promoter_counts.tsv`, `promoter_activity.tsv`, `promoter_dexseq_results.tsv`, `alternative_promoters.tsv` | Promoter activity and differential promoter usage (see **Promoter usage**; replaces `proactiv/`). |
+| **suppa2/**    | `events_A3/A5/AF/AL/MX/RI/SE_*.ioe`, `psi/`, `diffsplice/` | Alternative splicing events, PSI (Percent Spliced In) values (`*_filtered.psi` keeps events with a PSI value in at least two samples) and differential splicing (see **Differential splicing (SUPPA2)**). |
+| **sqanti3/**   | `nextlongiso_classification.txt`, `nextlongiso_junctions.txt`, `nextlongiso_SQANTI3_report.html`, `sqanti3_category_counts.tsv` | SQANTI3 structural categories of the Bambu transcripts (`--run_sqanti3`). |
 | **TE/**        | `TE_family_counts.tsv`, `TE_instance_counts.tsv`, `isoform_TE_annotation.tsv`, `isoform_TE_exonization.tsv` | TE expression, per-isoform TE annotation and strict TE exonization events (see **TE quantification modes**). |
 | **TE/DE/**     | `DE_TE_Family_results.csv`, `DE_TE_Instance_results.csv`, `norm_counts_*.csv`, `pca_*.pdf`, `volcano_*.pdf` | Differential expression of TE subfamilies and individual TE instances. |
-| **multiqc/**   | `multiqc_report.html`, `multiqc_report_data/` | Alignment statistics, numbers of differentially expressed genes/transcripts and software versions. |
+| **multiqc/**   | `multiqc_report.html`, `multiqc_report_data/` | Read QC, alignment statistics, numbers of differentially expressed genes/transcripts and software versions. |
 | **pipeline_info/** | `execution_report_*.html`, `execution_timeline_*.html`, `execution_trace_*.txt`, `pipeline_dag_*.html`, `software_versions.yml` | Resource usage, run timeline, task trace, workflow graph and the exact version of every tool. |
 
 **Note**: Some output files (e.g., `alternative_promoters.tsv`, `APA_gene_summary.csv`) are only written when the corresponding events are detected. With a single condition, differential analyses write a file with a `Message` column explaining why they were skipped.
@@ -301,7 +373,7 @@ We also welcome community contributions. Users are encouraged to:
 * Suggest new features
 * Contribute improvements through **Pull Requests**
 
-Changes between versions are listed in [CHANGELOG.md](CHANGELOG.md). Continuous integration (`.github/workflows/ci.yml`) checks the parameter schemas, lints the code, runs a unit test of the TE analysis and a stub run of the test profile on every push and pull request.
+Changes between versions are listed in [CHANGELOG.md](CHANGELOG.md). Continuous integration (`.github/workflows/ci.yml`) checks the parameter schemas, lints the code, runs unit tests of the TE and APA analyses and stub runs of the test profile (default settings, and with `--run_sqanti3` and a design covariate) on every push and pull request.
 
 While we aim to maintain long-term support for NextLongIso, development priorities may evolve as the software and research needs grow.
 
@@ -310,7 +382,7 @@ While we aim to maintain long-term support for NextLongIso, development prioriti
 If you use NextLongIso in your work, please cite:
 
 Tan J. et al. (2026). **NextLongIso: a comprehensive Nextflow pipeline for multi-dimensional long-read RNA-seq analysis.** Bioinformatics. https://academic.oup.com/bioinformatics/advance-article/doi/10.1093/bioinformatics/btag518/8750111.
-* **The individual tools used within the pipeline:** minimap2, samtools, deepTools, Bambu, SUPPA2, IsoformSwitchAnalyzeR, proActiv, DESeq2, bedtools, MultiQC, etc.
+* **The individual tools used within the pipeline:** minimap2, samtools, deepTools, Bambu, SUPPA2, IsoformSwitchAnalyzeR, DEXSeq, proActiv, DESeq2, gffread, bedtools, NanoPlot, seqkit, SQANTI3 (optional), MultiQC, etc.
 
 The paper describes NextLongIso **v0.1.0**. To run exactly that version:
 
