@@ -210,11 +210,60 @@
                     "fa_icon": "fas fa-filter",
                     "description": "Minimum |dIF| for significant isoform switches (IsoformSwitchAnalyzeR default 0.1)."
                 },
-                "seed": {
+                "usage_alpha": {
+                    "type": "number",
+                    "default": 0.05,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "fa_icon": "fas fa-filter",
+                    "description": "Gene-level q-value cutoff (DEXSeq perGeneQValue) for differential PAS and promoter usage."
+                }
+            }
+        },
+        "apa_options": {
+            "title": "Alternative polyadenylation (APA) options",
+            "type": "object",
+            "fa_icon": "fas fa-cut",
+            "description": "PAS clusters from transcript 3' ends, tested with DEXSeq (see 'APA' in the README).",
+            "properties": {
+                "apa_cluster_window": {
                     "type": "integer",
-                    "default": 42,
-                    "fa_icon": "fas fa-dice",
-                    "description": "Random seed (simulated p-values of the APA Fisher tests)."
+                    "default": 25,
+                    "minimum": 0,
+                    "fa_icon": "fas fa-arrows-alt-h",
+                    "description": "Transcript 3' ends within this distance (bp) of the previous end join the same PAS cluster."
+                },
+                "apa_max_cluster_width": {
+                    "type": "integer",
+                    "default": 50,
+                    "minimum": 1,
+                    "fa_icon": "fas fa-ruler-horizontal",
+                    "description": "Maximal width of a PAS cluster (bp); prevents chaining of distant sites."
+                },
+                "apa_ip_a_frac": {
+                    "type": "number",
+                    "default": 0.7,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "fa_icon": "fas fa-percentage",
+                    "description": "Fraction of A in the 20 nt downstream of a novel 3' end that flags internal priming (a run of >= 6 A also flags)."
+                },
+                "apa_internal_priming": {
+                    "type": "string",
+                    "default": "filter",
+                    "enum": [
+                        "filter",
+                        "flag"
+                    ],
+                    "fa_icon": "fas fa-flag",
+                    "description": "'filter' removes suspected internal-priming 3' ends of novel transcripts; 'flag' keeps and marks them."
+                },
+                "apa_min_count": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 0,
+                    "fa_icon": "fas fa-sort-numeric-up",
+                    "description": "Minimal number of reads of a PAS over all samples; genes need >= 2 PAS after this filter."
                 }
             }
         },
@@ -370,6 +419,9 @@
         },
         {
             "$ref": "#/$defs/differential_analysis_options"
+        },
+        {
+            "$ref": "#/$defs/apa_options"
         },
         {
             "$ref": "#/$defs/promoter_options"

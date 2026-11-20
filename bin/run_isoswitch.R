@@ -1,12 +1,12 @@
 #!/usr/bin/env Rscript
-# NextLongIso: isoform switching (IsoformSwitchAnalyzeR), alternative TSS/TTS usage and
-# poly(A)-site (APA) usage from Bambu isoforms.
+# NextLongIso: isoform switching (IsoformSwitchAnalyzeR) and alternative TSS/TTS usage from Bambu
+# isoforms. (Poly(A)-site usage is analysed by the APA process: apa_sites.R, usage_dexseq.R.)
 #
 # Usage:
 #   run_isoswitch.R --counts=counts_transcript.txt --abundance=CPM_transcript.txt \
 #               --gtf=extended_annotations.gtf --design=design.csv --design-formula="~ condition" \
 #               --reference=control \
-#               --alpha=0.05 --dif-cutoff=0.1 --seed=42
+#               --alpha=0.05 --dif-cutoff=0.1
 #
 # Every non-reference condition is compared with the reference (condition_1 = reference,
 # condition_2 = other condition; dIF and dPAU are condition_2 - condition_1).
@@ -15,8 +15,6 @@
 #   isoform_switch_results.csv        isoformFeatures for all comparisons (required)
 #   significant_switches.csv          q < alpha and |dIF| > dif-cutoff (required)
 #   all_AS_events.csv, atss_results.csv, atts_results.csv
-#   clustered_base_level_PAS_usage.csv  PAS-cluster usage per comparison
-#   APA_gene_summary.csv              one row per (comparison, gene) with significant APA
 #   switchlist.rds
 # With fewer than 2 conditions the two required files contain a single 'Message' column.
 
@@ -30,12 +28,11 @@ suppressPackageStartupMessages({
 .script <- sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[1])
 source(file.path(dirname(normalizePath(.script)), "nli_design.R"))
 opt <- parse_args(commandArgs(trailingOnly = TRUE))
-for (k in c("counts", "abundance", "gtf", "design", "design-formula", "reference", "alpha", "dif-cutoff", "seed")) {
+for (k in c("counts", "abundance", "gtf", "design", "design-formula", "reference", "alpha", "dif-cutoff")) {
     if (is.null(opt[[k]])) stop(sprintf("Missing required argument --%s", k))
 }
 alpha      <- as.numeric(opt$alpha)
 dif_cutoff <- as.numeric(opt[["dif-cutoff"]])
-seed       <- as.integer(opt$seed)
 
 strip_suffix  <- function(x) sub("[.]sorted([.]bam)?$", "", x)
 write_message <- function(file, msg) write.csv(data.frame(Message = msg), file, row.names = FALSE)
@@ -129,109 +126,7 @@ feat <- switchList$isoformFeatures
 clean_id <- function(x) trimws(gsub('"', '', sub(".*:", "", as.character(x))))
 feat$iso_clean <- clean_id(feat$isoform_id)
 
-# ---- 3. APA: cluster 3' ends and compare PAS-cluster usage per comparison ---------------------
-exons_df <- as.data.frame(switchList$exons)
-pas_final <- NULL
-if (nrow(exons_df) > 0) {
-    message("--- Clustering 3' ends ---")
-    pas_raw <- do.call(rbind, lapply(split(exons_df, exons_df$isoform_id), function(x) {
-        data.frame(
-            isoform_id = as.character(x$isoform_id[1]),
-            seqnames   = as.character(x$seqnames[1]),
-            strand     = as.character(x$strand[1]),
-            pas_coord  = if (x$strand[1] == "+") max(x$end) else min(x$start),
-            stringsAsFactors = FALSE
-        )
-    }))
-    pas_gr       <- makeGRangesFromDataFrame(pas_raw, start.field = "pas_coord", end.field = "pas_coord")
-    pas_clusters <- resize(reduce(resize(pas_gr, width = 25, fix = "center")), width = 1, fix = "center")
-    hits_df <- as.data.frame(findOverlaps(pas_gr, pas_clusters, maxgap = 25))
-    hits_df <- hits_df[!duplicated(hits_df$queryHits), ]
-    pas_raw$row_idx <- seq_len(nrow(pas_raw))
-    pas_mapped <- merge(pas_raw, data.frame(
-        row_idx        = hits_df$queryHits,
-        pas_cluster_id = paste0("PAS_", hits_df$subjectHits),
-        cluster_coord  = start(pas_clusters[hits_df$subjectHits]),
-        stringsAsFactors = FALSE
-    ), by = "row_idx")
-    pas_mapped$iso_clean <- clean_id(pas_mapped$isoform_id)
-
-    set.seed(seed)
-    per_comparison <- list()
-    for (k in seq_len(nrow(comparisons))) {
-        c1 <- comparisons$condition_1[k]
-        c2 <- comparisons$condition_2[k]
-        # isoformFeatures has one row per isoform and comparison: use only this comparison's rows
-        fc  <- feat[feat$condition_1 == c1 & feat$condition_2 == c2, ]
-        idx <- match(pas_mapped$iso_clean, fc$iso_clean)
-        pm  <- cbind(pas_mapped[!is.na(idx), ],
-                     fc[idx[!is.na(idx)], c("gene_id", "IF1", "IF2", "gene_value_1", "gene_value_2")])
-        if (nrow(pm) == 0) {
-            message(sprintf("APA %s vs %s: no isoforms with PAS clusters", c2, c1))
-            next
-        }
-        pm$gene_id <- ifelse(is.na(pm$gene_id), pm$iso_clean, as.character(pm$gene_id))
-        pm$c1 <- pm$IF1 * pm$gene_value_1   # expression of the isoform in condition_1
-        pm$c2 <- pm$IF2 * pm$gene_value_2   # expression of the isoform in condition_2
-
-        agg <- aggregate(cbind(IF1, IF2, c1, c2) ~ gene_id + seqnames + cluster_coord + strand + pas_cluster_id,
-                         data = pm, FUN = sum, na.rm = TRUE)
-        if (nrow(agg) == 0) next
-        agg$dPAU        <- agg$IF2 - agg$IF1
-        agg$pas_p_value <- NA_real_
-        agg$n_sites     <- NA_integer_
-
-        for (g in unique(agg$gene_id)) {
-            rows <- which(agg$gene_id == g)
-            agg$n_sites[rows] <- length(rows)
-            if (length(rows) < 2) next
-            mat <- as.matrix(agg[rows, c("c1", "c2")])
-            if (all(mat >= 0) && sum(mat) > 10) {
-                agg$pas_p_value[rows] <- tryCatch({
-                    mat_int <- round(mat)
-                    mat_int <- mat_int[rowSums(mat_int) > 0, , drop = FALSE]
-                    if (nrow(mat_int) > 1) fisher.test(mat_int, simulate.p.value = TRUE, B = 10000)$p.value else NA_real_
-                }, error = function(e) NA_real_)
-            }
-        }
-        agg$pas_q_value <- NA_real_
-        ok <- !is.na(agg$pas_p_value)
-        if (any(ok)) agg$pas_q_value[ok] <- p.adjust(agg$pas_p_value[ok], method = "BH")
-
-        agg <- cbind(condition_1 = c1, condition_2 = c2, agg, stringsAsFactors = FALSE)
-        message(sprintf("APA %s vs %s: %d genes tested, %d PAS clusters with q < %g",
-                        c2, c1, length(unique(agg$gene_id[agg$n_sites > 1])),
-                        sum(agg$pas_q_value < alpha, na.rm = TRUE), alpha))
-        per_comparison[[k]] <- agg
-    }
-    per_comparison <- Filter(Negate(is.null), per_comparison)
-    if (length(per_comparison) > 0) pas_final <- do.call(rbind, per_comparison)
-}
-
-if (!is.null(pas_final) && nrow(pas_final) > 0) {
-    write.csv(pas_final[order(pas_final$pas_q_value, na.last = TRUE), ],
-              "clustered_base_level_PAS_usage.csv", row.names = FALSE)
-
-    # Per comparison and gene: the significant PAS cluster with the largest |dPAU|, so that
-    # dPAU, q-value and cluster coordinates all come from the same site.
-    sig <- pas_final[!is.na(pas_final$pas_q_value) & pas_final$pas_q_value < alpha, ]
-    if (nrow(sig) > 0) {
-        # Ties in |dPAU| (common for two-site genes, whose dPAU values are +x and -x) are broken
-        # deterministically by q-value and then cluster coordinate
-        sig <- sig[order(sig$condition_2, sig$gene_id, -abs(sig$dPAU), sig$pas_q_value, sig$cluster_coord), ]
-        top <- sig[!duplicated(sig[, c("condition_1", "condition_2", "gene_id")]),
-                   c("condition_1", "condition_2", "gene_id", "seqnames", "strand", "pas_cluster_id",
-                     "cluster_coord", "dPAU", "pas_p_value", "pas_q_value", "n_sites")]
-        write.csv(top, "APA_gene_summary.csv", row.names = FALSE)
-        message("APA_gene_summary.csv: ", nrow(top), " gene(s)")
-    } else {
-        message("No significant APA (q < ", alpha, "); APA_gene_summary.csv not written")
-    }
-} else {
-    message("No PAS usage could be computed; APA outputs not written")
-}
-
-# ---- 4. Switch tables --------------------------------------------------------------------------
+# ---- 3. Switch tables --------------------------------------------------------------------------
 saveRDS(switchList, "switchlist.rds")
 write.csv(feat, "isoform_switch_results.csv", row.names = FALSE)
 sig_switch <- feat[which(feat$isoform_switch_q_value < alpha & abs(feat$dIF) > dif_cutoff), ]

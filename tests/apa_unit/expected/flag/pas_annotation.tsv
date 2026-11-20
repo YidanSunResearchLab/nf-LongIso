@@ -1,0 +1,6 @@
+gene_id	pas_id	chr	strand	start	end	pas_coord	n_transcripts	transcripts	annotated	internal_priming	pas_signal	reads
+G1	PAS1	chrS	+	1000	1000	1000	1	BambuTx1	no	yes	NA	10
+G1	PAS2	chrS	+	2000	2000	2000	1	BambuTx2	no	no	AATAAA	10
+G1	PAS3	chrS	+	3000	3000	3000	1	BambuTx3	no	no	NA	10
+G1	PAS4	chrS	+	3030	3030	3030	1	ENST1	yes	no	NA	10
+G2	PAS1	chrS	+	4000	4000	4000	1	ENST2	yes	no	NA	10

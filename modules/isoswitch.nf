@@ -1,5 +1,5 @@
 /*
- * Isoform switching, alternative TSS/TTS and APA (IsoformSwitchAnalyzeR). R code: bin/run_isoswitch.R
+ * Isoform switching and alternative TSS/TTS (IsoformSwitchAnalyzeR). R code: bin/run_isoswitch.R
  */
 
 process ISOSWITCH {
@@ -19,8 +19,6 @@ process ISOSWITCH {
     path "atss_results.csv"                  , emit: atss_results, optional: true
     path "atts_results.csv"                  , emit: atts_results, optional: true
     path "all_AS_events.csv"                 , emit: all_as_events, optional: true
-    path "clustered_base_level_PAS_usage.csv", emit: pas_usage, optional: true
-    path "APA_gene_summary.csv"              , emit: apa_summary, optional: true
     path "switchlist.rds"                    , emit: switchlist, optional: true
     path "versions.yml"                      , emit: versions
 
@@ -34,8 +32,7 @@ process ISOSWITCH {
         --design-formula='${params.design}' \\
         --reference=${reference} \\
         --alpha=${params.isoswitch_alpha} \\
-        --dif-cutoff=${params.isoswitch_dif_cutoff} \\
-        --seed=${params.seed}
+        --dif-cutoff=${params.isoswitch_dif_cutoff}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

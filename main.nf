@@ -19,6 +19,7 @@ include { ISOSWITCH }                                                          f
 include { PROACTIV }                                                           from './modules/proactiv.nf'
 include { SOFTWARE_VERSIONS; MULTIQC }                                         from './modules/multiqc.nf'
 include { MAKE_DESIGN }                                                        from './modules/design.nf'
+include { APA }                                                                from './modules/apa.nf'
 
 /*
  * Covariates of --design ('~ condition' or '~ cov1 + cov2 + condition'), in formula order.
@@ -203,6 +204,10 @@ workflow {
     DESEQ2_GENE(BAMBU.out.gene_counts, ch_design, 'gene', reference)
     DESEQ2_TRANSCRIPT(ch_transcript_counts, ch_design, 'transcript', reference)
     SUPPA2(ch_extended_gtf, ch_transcript_counts)
+    // Alternative polyadenylation (DEXSeq on PAS clusters)
+    APA(ch_extended_gtf, ch_transcript_counts, ch_design, reference, file(params.genome), ch_fai)
+    ch_versions = ch_versions.mix(APA.out.versions)
+
     ch_versions = ch_versions.mix(ISOSWITCH.out.versions, DESEQ2_GENE.out.versions,
                                   DESEQ2_TRANSCRIPT.out.versions, SUPPA2.out.versions)
 
