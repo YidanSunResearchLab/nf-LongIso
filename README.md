@@ -235,8 +235,7 @@ With `--te_gtf`, NextLongIso links Bambu isoforms to transposable elements (TEs)
 | Overlap tested | Isoform **exons** vs TE, at least `--te_min_overlap` bp (default 20) | Whole isoform **span** (first to last base, including introns) vs TE |
 | Strand | `--te_strand sense` (default) or `both` | Same strand only |
 | Isoform overlapping several TEs | Counted once for each TE subfamily / instance it overlaps | Counted for only one of them (the last overlap reported) |
-| `isoform_TE_exonization.tsv` | Junction **endpoints** at both exon boundaries, every TE per transcript | v0.1.0 test (junction intervals near both ends; one TE per transcript) |
-| Use | Recommended for new analyses | Reproduces **all** v0.1.0 TE outputs (counts, exonization table, TE DE) |
+| Use | Recommended for new analyses | Comparison with the v0.1.0 counting rule |
 
 **Why the default changed.** A TE inside an intron is not part of the mature transcript, but the span mode counts every read of the host transcript for it. Span-mode TE counts therefore largely mirror host-gene expression (see `docs/te_count_mode_comparison.md`), whereas the exon mode only counts transcripts that actually contain TE sequence, and counts each one for every subfamily/instance it contains.
 
@@ -254,9 +253,9 @@ Both modes produce `TE_family_counts.tsv` and `TE_instance_counts.tsv` with the 
 
 `exon_positions` lists every exon position the TE touches (any overlap, `first`, `internal`, `last`, separated by `;`; a single-exon isoform is `first;last`), so overlaps that did not decide the category are still visible. `junction_supported` is `yes` when every splice site of the touched exons matches an observed junction (±5 bp), `no` otherwise, and `NA` for single-exon isoforms.
 
-`TE/isoform_TE_exonization.tsv` keeps the strict definition of TE exonization: a novel exon outside all annotated exons, at least 90 % covered by a same-strand TE, whose two boundaries both match junctions observed in the reads (±5 bp). In exon mode each boundary must match a junction **endpoint**, so novel terminal exons (a TE-derived first or last exon has only one splice site) are not listed here; they appear in `isoform_TE_annotation.tsv` as `TSS`, `PAS` or `autonomous`. Span mode uses the v0.1.0 test unchanged. With BAM input, junctions are extracted as well, so this works for both input types.
+`TE/isoform_TE_exonization.tsv` keeps the strict definition of TE exonization: a novel exon outside all annotated exons, at least 90 % covered by a same-strand TE, whose two boundaries both match junctions observed in the reads (±5 bp). Each boundary must match a junction **endpoint**, so novel terminal exons (a TE-derived first or last exon has only one splice site) are not listed here; they appear in `isoform_TE_annotation.tsv` as `TSS`, `PAS` or `autonomous`. The annotation and exonization tables do not depend on `--te_count_mode`. With BAM input, junctions are extracted as well, so this works for both input types.
 
-**Reproducing v0.1.0 TE results**: add `--te_count_mode span`. On the demo data, every file that v0.1.0 writes to `TE/` is reproduced (see `docs/dev/v0.2.0_vs_v0.1.0.md`); only `isoform_TE_annotation.tsv` is additional. Alternatively, run the original release with `-r v0.1.0` (see Citation).
+**Published results**: to reproduce the results of the paper (v0.1.0) exactly, run that version with `-r v0.1.0` (see Citation). `--te_count_mode span` only switches the TE counting rule back to the v0.1.0 one, for comparison with the exon mode.
 
 📂 **Output**
 

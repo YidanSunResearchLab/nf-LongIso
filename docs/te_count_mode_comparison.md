@@ -7,14 +7,15 @@ NextLongIso v0.2.0 counts TE expression in two ways (`--te_count_mode`):
   once per TE instance it contains.
 * **span** (v0.1.0): an isoform is counted for a TE that overlaps its **span** (first to last base,
   including introns) on the same strand; when several TEs overlap, only the last one reported by
-  bedtools receives the counts. Span mode also keeps the v0.1.0 exonization test, so every v0.1.0 TE
-  output is reproduced.
+  bedtools receives the counts. It is kept as a comparison option; the annotation and exonization
+  tables are the same in both modes. To reproduce the published v0.1.0 results exactly, use `-r v0.1.0`.
 
 ## Data and commands
 
 Demo data (GM12878 ×2 vs H1 ×2, 10,000 long reads per sample), GRCh38, GENCODE annotation and
 `TEtranscript_hg38_rmsk_TE.gtf`; runs `demo_v0.2.0` (exon) and `demo_v0.2.0_span` (span, `-resume`), see
-`docs/dev/v0.2.0_vs_v0.1.0.md`. The span run's TE outputs reproduce v0.1.0 (file-by-file comparison there).
+`docs/dev/v0.2.0_vs_v0.1.0.md`. The span run's TE counts and TE DESeq2 results are identical to v0.1.0
+(same counting rule; comparison there).
 
 ```bash
 # host genes of each subfamily (bedtools container)

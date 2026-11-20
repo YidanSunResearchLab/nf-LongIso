@@ -1,14 +1,14 @@
 #!/bin/sh
 # Unit test for bin/te_analysis.sh on a synthetic locus (chrT); expected outputs were derived by hand
-# (exon mode) or produced by the v0.1.0 code (span mode).
+# (span-mode counts follow the v0.1.0 counting rule and match the output of the v0.1.0 code).
 #   R1  reference transcript (2 exons); a MIR overlaps the first exon            -> TSS
 #   N1  4 exons; two novel intronic exons fully covered by AluY / L1M, both ends supported by
-#       junctions -> two exonization rows in exon mode (v0.1.0/span: none, the ID occurs 4 times)
+#       junctions -> two exonization rows (v0.1.0 reported none: the ID occurs 4 times)
 #   N2  single-exon transcript, 75 % covered by L2                               -> autonomous
-#   N3  novel exon covered by MER5A, only spanned by an exon-skipping junction   -> not validated in
-#       exon mode; validated by the v0.1.0 window test (span mode)
-# Files are compared on the header line plus the sorted remaining rows (span mode writes counts in
-# awk array order, as v0.1.0 did, which differs between awk implementations).
+#   N3  novel exon covered by MER5A, only spanned by an exon-skipping junction   -> not validated
+#       (v0.1.0 validated it)
+# The annotation and exonization tables are the same in both counting modes.
+# Files are compared on the header line plus the sorted remaining rows.
 # Run inside a container that provides bedtools, e.g. quay.io/biocontainers/bedtools:2.31.1--h13024bc_3:
 #   sh tests/te_unit/run_te_unit_test.sh
 set -eu

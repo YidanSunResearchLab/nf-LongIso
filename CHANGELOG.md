@@ -19,13 +19,14 @@ during the work on v0.2.0.
   a sorted BAM; `results/minimap2/` holds BAM, BAI, `.stats` and `.flagstat` (issue 14).
 - **`DE_genes/` is now gene level** (from `counts_gene.txt`); v0.1.0 wrote transcript-level results there.
   Transcript-level results moved to the new **`DE_transcripts/`** (issue 6).
-- **TE counting now defaults to the exon mode** (`--te_count_mode exon`). Use `--te_count_mode span` to
-  reproduce all v0.1.0 TE outputs (issue 12).
-- **In exon mode, `isoform_TE_exonization.tsv` uses a stricter junction test**: each exon boundary must
-  match an observed junction endpoint. Novel *terminal* exons (one splice site, e.g. a TE-derived first or
-  last exon) are therefore no longer listed there; they remain visible in `isoform_TE_annotation.tsv`
-  (categories `TSS`, `PAS` or `autonomous`). Columns 3-5 are named `exon_chr`, `exon_start`, `exon_end`
-  (v0.1.0 labelled the same exon coordinates `tx_*`; span mode keeps the v0.1.0 names) (issue 12).
+- **TE counting now defaults to the exon mode** (`--te_count_mode exon`). `--te_count_mode span` keeps the
+  v0.1.0 counting rule (overlap with the whole transcript span) as a comparison option. To reproduce the
+  published v0.1.0 results exactly, run the pipeline with `-r v0.1.0` (issue 12).
+- **`isoform_TE_exonization.tsv` uses a stricter junction test** (in both counting modes): each exon
+  boundary must match an observed junction endpoint. Novel *terminal* exons (one splice site, e.g. a
+  TE-derived first or last exon) are therefore no longer listed there; they remain visible in
+  `isoform_TE_annotation.tsv` (categories `TSS`, `PAS` or `autonomous`). Columns 3-5 are named `exon_chr`,
+  `exon_start`, `exon_end` (v0.1.0 labelled the same exon coordinates `tx_*`) (issue 12).
 - **Default resources changed**: requests are capped by `--max_cpus 16 --max_memory 128.GB --max_time 72.h`
   (v0.1.0 requested up to 64 CPUs for minimap2 and 200 GB for Bambu) (issue 1); memory and time grow on
   retry (issue 15).
@@ -119,8 +120,8 @@ during the work on v0.2.0.
   seeded (`--seed`) (issue 8).
 - proActiv: species and alternative-promoter thresholds were hard-coded; samples were matched to
   conditions by prefix/substring (issue 9).
-- TE (exon mode): a transcript overlapping several TEs kept only the last one (`data[$4]` overwrite) in
-  the counts and in `isoform_TE_exonization.tsv`; junction validation counted junction hits per
+- TE: a transcript overlapping several TEs kept only the last one (`data[$4]` overwrite) in
+  the exon-mode counts and in `isoform_TE_exonization.tsv`; junction validation counted junction hits per
   transcript (transcripts with two TE exons were dropped) and accepted exons only spanned by an
   exon-skipping junction (`docs/dev/verification.md` V3); TE GTF attributes are parsed by name instead of
   a greedy `sed` (issue 12).

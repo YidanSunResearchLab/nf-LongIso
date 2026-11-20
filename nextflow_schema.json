@@ -248,8 +248,8 @@
                         "span"
                     ],
                     "fa_icon": "fas fa-calculator",
-                    "description": "TE quantification: 'exon' counts transcripts whose exons overlap a TE; 'span' reproduces v0.1.0 (overlap with the whole transcript span).",
-                    "help_text": "Use 'span' to reproduce results produced with v0.1.0 (Bioinformatics 2026). See 'TE quantification modes' in the README."
+                    "description": "TE quantification: 'exon' counts transcripts whose exons overlap a TE; 'span' uses the v0.1.0 rule (overlap with the whole transcript span), as a comparison option.",
+                    "help_text": "Only the TE family/instance counts (and TE differential expression) depend on this option. To reproduce the published v0.1.0 results exactly, run the pipeline with -r v0.1.0. See 'TE quantification modes' in the README."
                 },
                 "te_min_overlap": {
                     "type": "integer",

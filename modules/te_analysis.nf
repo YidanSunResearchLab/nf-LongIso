@@ -3,7 +3,8 @@
  *
  * --te_count_mode exon (default): counts from exon-TE overlaps >= --te_min_overlap bp,
  *     one count per (transcript, subfamily) and per (transcript, TE instance)
- * --te_count_mode span: v0.1.0 counting (whole transcript span), to reproduce published results
+ * --te_count_mode span: v0.1.0 counting rule (whole transcript span), as a comparison option
+ * The annotation and the strict exonization table are the same in both modes.
  */
 
 process TE_ANALYSIS {
