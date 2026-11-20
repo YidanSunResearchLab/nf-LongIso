@@ -6,7 +6,7 @@
 #
 # Usage:
 #   run_te_deseq2.R --te-counts=TE_family_counts.tsv --tx-counts=counts_transcript.txt \
-#               --design=design.csv --type=Family --reference=control
+#               --design=design.csv --design-formula="~ condition" --type=Family --reference=control
 #
 # Outputs (<type> = Family or Instance)
 #   DE_TE_<type>_results.csv                  (exactly 2 conditions)
@@ -18,17 +18,11 @@ suppressPackageStartupMessages({
     library(ggplot2)
 })
 
-parse_args <- function(args) {
-    # Base-R parser for --key=value arguments (no optparse dependency)
-    out <- list()
-    for (a in args) {
-        if (!grepl("^--[A-Za-z0-9_-]+=", a)) stop(sprintf("Arguments must be given as --key=value (got '%s')", a))
-        out[[sub("^--([^=]+)=.*$", "\\1", a)]] <- sub("^--[^=]+=", "", a)
-    }
-    out
-}
+# Shared helpers (parse_args, design handling) from bin/nli_design.R
+.script <- sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[1])
+source(file.path(dirname(normalizePath(.script)), "nli_design.R"))
 opt <- parse_args(commandArgs(trailingOnly = TRUE))
-for (k in c("te-counts", "tx-counts", "design", "type", "reference")) {
+for (k in c("te-counts", "tx-counts", "design", "design-formula", "type", "reference")) {
     if (is.null(opt[[k]])) stop(sprintf("Missing required argument --%s", k))
 }
 type <- opt$type
@@ -64,17 +58,14 @@ te_mat <- te_mat[, design$sample, drop = FALSE]
 tx_mat <- tx_mat[, design$sample, drop = FALSE]
 
 combined   <- rbind(as.matrix(tx_mat), as.matrix(te_mat))
-coldata    <- data.frame(row.names = design$sample, condition = factor(design$condition))
-conditions <- levels(coldata$condition)
 reference  <- opt$reference
-if (length(conditions) > 1) {
-    if (!reference %in% conditions) stop(sprintf("Reference condition '%s' not found in the design", reference))
-    coldata$condition <- relevel(coldata$condition, ref = reference)
-}
+coldata    <- design_coldata(design, opt[["design-formula"]], reference)
+conditions <- levels(coldata$condition)
+formula    <- design_formula(opt[["design-formula"]], coldata)
+check_full_rank(formula, coldata)
 
 # ---- 2. DESeq2 -------------------------------------------------------------------------------
-dds <- DESeqDataSetFromMatrix(countData = round(combined), colData = coldata,
-                              design = if (length(conditions) > 1) ~ condition else ~ 1)
+dds <- DESeqDataSetFromMatrix(countData = round(combined), colData = coldata, design = formula)
 
 if (length(conditions) > 1) {
     dds <- DESeq(dds)

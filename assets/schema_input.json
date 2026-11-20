@@ -2,9 +2,11 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://raw.githubusercontent.com/YidanSunResearchLab/nf-LongIso/main/assets/schema_input.json",
     "title": "NextLongIso samplesheet",
-    "description": "Schema for the file provided with --samplesheet. Columns: sample,condition and either fastq (--input_type fastq) or bam (--input_type bam).",
+    "description": "Schema for the file provided with --samplesheet. Columns: sample,condition and either fastq (--input_type fastq) or bam (--input_type bam). Additional columns are allowed and can be used as covariates in --design (categorical values following the sample-name rules).",
     "type": "array",
-    "uniqueEntries": ["sample"],
+    "uniqueEntries": [
+        "sample"
+    ],
     "items": {
         "type": "object",
         "properties": {
@@ -12,13 +14,17 @@
                 "type": "string",
                 "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
                 "errorMessage": "Sample names are required, must be unique, must start with a letter and may contain only letters, digits and underscores (regex ^[A-Za-z][A-Za-z0-9_]*$). Characters such as '.' or '-' are not allowed because R and DESeq2 rewrite such names, which breaks the matching between count tables and the samplesheet.",
-                "meta": ["id"]
+                "meta": [
+                    "id"
+                ]
             },
             "condition": {
                 "type": "string",
                 "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
                 "errorMessage": "Condition is required for every sample, must start with a letter and may contain only letters, digits and underscores (regex ^[A-Za-z][A-Za-z0-9_]*$). Characters such as '.' or '-' are not allowed because R and DESeq2 rewrite such names.",
-                "meta": ["condition"]
+                "meta": [
+                    "condition"
+                ]
             },
             "fastq": {
                 "type": "string",
@@ -35,10 +41,21 @@
                 "errorMessage": "BAM file must exist, must not contain spaces and must end with .bam"
             }
         },
-        "required": ["sample", "condition"],
+        "required": [
+            "sample",
+            "condition"
+        ],
         "anyOf": [
-            { "required": ["fastq"] },
-            { "required": ["bam"] }
+            {
+                "required": [
+                    "fastq"
+                ]
+            },
+            {
+                "required": [
+                    "bam"
+                ]
+            }
         ]
     }
 }

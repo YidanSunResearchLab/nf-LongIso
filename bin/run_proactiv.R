@@ -19,15 +19,9 @@ suppressPackageStartupMessages({
     library(SummarizedExperiment)
 })
 
-parse_args <- function(args) {
-    # Base-R parser for --key=value arguments (no optparse dependency)
-    out <- list()
-    for (a in args) {
-        if (!grepl("^--[A-Za-z0-9_-]+=", a)) stop(sprintf("Arguments must be given as --key=value (got '%s')", a))
-        out[[sub("^--([^=]+)=.*$", "\\1", a)]] <- sub("^--[^=]+=", "", a)
-    }
-    out
-}
+# Shared helpers (parse_args, design handling) from bin/nli_design.R
+.script <- sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[1])
+source(file.path(dirname(normalizePath(.script)), "nli_design.R"))
 opt <- parse_args(commandArgs(trailingOnly = TRUE))
 for (k in c("gtf", "design", "species", "reference", "altprom-args-file", "cpus")) {
     if (is.null(opt[[k]])) stop(sprintf("Missing required argument --%s", k))

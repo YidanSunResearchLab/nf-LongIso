@@ -4,7 +4,8 @@
 #
 # Usage:
 #   run_isoswitch.R --counts=counts_transcript.txt --abundance=CPM_transcript.txt \
-#               --gtf=extended_annotations.gtf --design=design.csv --reference=control \
+#               --gtf=extended_annotations.gtf --design=design.csv --design-formula="~ condition" \
+#               --reference=control \
 #               --alpha=0.05 --dif-cutoff=0.1 --seed=42
 #
 # Every non-reference condition is compared with the reference (condition_1 = reference,
@@ -25,17 +26,11 @@ suppressPackageStartupMessages({
     library(GenomicRanges)
 })
 
-parse_args <- function(args) {
-    # Base-R parser for --key=value arguments (no optparse dependency)
-    out <- list()
-    for (a in args) {
-        if (!grepl("^--[A-Za-z0-9_-]+=", a)) stop(sprintf("Arguments must be given as --key=value (got '%s')", a))
-        out[[sub("^--([^=]+)=.*$", "\\1", a)]] <- sub("^--[^=]+=", "", a)
-    }
-    out
-}
+# Shared helpers (parse_args, design handling) from bin/nli_design.R
+.script <- sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[1])
+source(file.path(dirname(normalizePath(.script)), "nli_design.R"))
 opt <- parse_args(commandArgs(trailingOnly = TRUE))
-for (k in c("counts", "abundance", "gtf", "design", "reference", "alpha", "dif-cutoff", "seed")) {
+for (k in c("counts", "abundance", "gtf", "design", "design-formula", "reference", "alpha", "dif-cutoff", "seed")) {
     if (is.null(opt[[k]])) stop(sprintf("Missing required argument --%s", k))
 }
 alpha      <- as.numeric(opt$alpha)
@@ -88,6 +83,13 @@ if (length(single) > 0) {
     message("Conditions with < 2 replicates are excluded from isoform switching: ", paste(single, collapse = ", "))
 }
 design <- design[design$condition %in% c(reference, others), ]
+covariates <- design_covariates(opt[["design-formula"]])
+if (length(covariates) > 0) {
+    # Covariates are passed as extra designMatrix columns (used by the DEXSeq-based switch test)
+    cd <- design_coldata(design, opt[["design-formula"]], reference)
+    check_full_rank(design_formula(opt[["design-formula"]], cd), cd)
+    message("Covariates: ", paste(covariates, collapse = ", "))
+}
 comparisons <- data.frame(condition_1 = reference, condition_2 = others, stringsAsFactors = FALSE)
 message("Comparisons: ", paste(comparisons$condition_2, "vs", comparisons$condition_1, collapse = "; "))
 
@@ -99,7 +101,8 @@ counts_data[, design$sample] <- round(counts_data[, design$sample])
 switchList <- importRdata(
     isoformCountMatrix   = counts_data,
     isoformRepExpression = abund_data,
-    designMatrix         = data.frame(sampleID = design$sample, condition = design$condition),
+    designMatrix         = data.frame(sampleID = design$sample, condition = design$condition,
+                                      design[, covariates, drop = FALSE], stringsAsFactors = FALSE),
     isoformExonAnnoation = opt$gtf,
     comparisonsToMake    = comparisons,
     showProgress         = FALSE,

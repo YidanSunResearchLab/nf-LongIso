@@ -21,13 +21,43 @@ include { SOFTWARE_VERSIONS; MULTIQC }                                         f
 include { MAKE_DESIGN }                                                        from './modules/design.nf'
 
 /*
- * Read and check the samplesheet. Returns a list of [meta, file] where file is the
- * FASTQ or BAM column, depending on --input_type.
+ * Covariates of --design ('~ condition' or '~ cov1 + cov2 + condition'), in formula order.
  */
-def readSamplesheet(samplesheet, input_type) {
+def designCovariates(design) {
+    def d = design.toString().trim()
+    if (!(d ==~ /^~\s*([A-Za-z][A-Za-z0-9_]*\s*\+\s*)*condition$/)) {
+        error "--design '${design}' must look like '~ condition' or '~ batch + condition': samplesheet columns joined by '+', with condition as the last term"
+    }
+    def covs = d.replaceFirst(/^~/, '').split(/\+/).collect { t -> t.trim() }.findAll { t -> t != 'condition' }
+    def reserved = covs.findAll { c -> c in ['sample', 'fastq', 'bam'] }
+    if (reserved) error "--design: column(s) ${reserved.join(', ')} cannot be used as covariates"
+    if (covs.size() != covs.unique(false).size()) error "--design '${design}' lists a covariate twice"
+    return covs
+}
+
+/*
+ * Read and check the samplesheet. Returns a list of [meta, file] where file is the
+ * FASTQ or BAM column, depending on --input_type; meta.covariates holds the design covariates.
+ */
+def readSamplesheet(samplesheet, input_type, covariates) {
     def rows = samplesheetToList(samplesheet, "${projectDir}/assets/schema_input.json")
+    // Covariate columns are not part of the schema: read them from the CSV itself
+    def table = covariates ? file(samplesheet).splitCsv(header: true) : []
+    def name_rule = /^[A-Za-z][A-Za-z0-9_]*$/
+    covariates.each { c ->
+        if (!(c ==~ name_rule)) error "Covariate column name '${c}' must match ${name_rule}"
+        if (!table || !table[0].containsKey(c)) error "--design uses column '${c}', which is not in the samplesheet"
+        def values = table.collect { r -> r[c]?.toString()?.trim() }
+        def bad = values.findAll { v -> !(v ==~ name_rule) }
+        if (bad) {
+            error "Samplesheet column '${c}' (used in --design) has invalid value(s) ${bad.unique().collect { v -> "'${v}'" }.join(', ')}: values must start with a letter and contain only letters, digits and underscores"
+        }
+        if (values.unique(false).size() < 2) error "Samplesheet column '${c}' (used in --design) has a single value; remove it from --design"
+    }
+    def cov_by_sample = table.collectEntries { r -> [ (r.sample.toString().trim()): covariates.collectEntries { c -> [ (c): r[c].toString().trim() ] } ] }
     def samples = rows.collect { row ->
         def meta = [ id: row[0].id.toString(), condition: row[0].condition.toString() ]
+        meta.covariates = covariates ? cov_by_sample[meta.id] : [:]
         def f = input_type == 'bam' ? row[2] : row[1]
         if (!f) {
             error "Sample '${meta.id}' has no '${input_type}' value, but --input_type ${input_type} was given. " +
@@ -70,7 +100,8 @@ workflow {
     log.info paramsSummaryLog(workflow)
 
     // 1. INPUT
-    def samples   = readSamplesheet(params.samplesheet, params.input_type)
+    def covariates = designCovariates(params.design)
+    def samples   = readSamplesheet(params.samplesheet, params.input_type, covariates)
     def reference = resolveReference(samples, params.reference_condition)
     def conditions = samples.collect { s -> s[0].condition }.unique().sort()
     log.info """
@@ -78,6 +109,7 @@ workflow {
           Input type          : ${params.input_type} (${samples.size()} samples)
           Conditions          : ${conditions.join(', ')}
           Reference condition : ${reference}${params.reference_condition ? '' : ' (chosen automatically)'}
+          Design              : ${params.design}${covariates ? " (covariates: ${covariates.join(', ')})" : ''}
           Genome / GTF        : ${params.genome} / ${params.gtf}
           TE analysis         : ${params.te_gtf ? "on (${params.te_gtf}); te_count_mode=${params.te_count_mode}, te_min_overlap=${params.te_min_overlap}, te_strand=${params.te_strand}" : 'off (no --te_gtf)'}
           minimap2            : ${params.input_type == 'fastq' ? "preset=${params.minimap2_preset}, junc_bed=${params.minimap2_junc_bed}, index=${params.minimap2_index ?: 'built by the pipeline'}, args='${params.minimap2_args}'" : 'not used (BAM input)'}
@@ -89,7 +121,9 @@ workflow {
     ch_versions = channel.empty()
 
     // Normalised design table (sample,condition) used by all R steps
-    ch_design = MAKE_DESIGN(samples.collect { s -> "${s[0].id},${s[0].condition}" }).csv
+    def design_lines = [ (['sample', 'condition'] + covariates).join(',') ] +
+        samples.collect { s -> ([ s[0].id, s[0].condition ] + covariates.collect { c -> s[0].covariates[c] }).join(',') }
+    ch_design = MAKE_DESIGN(design_lines, reference).csv
 
     // 2. ALIGNMENT (FASTQ) OR BAM PREPARATION
     if (params.input_type == 'fastq') {

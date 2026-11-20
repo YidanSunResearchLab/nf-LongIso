@@ -2,12 +2,14 @@
 # NextLongIso: differential expression with DESeq2 at gene or transcript level.
 #
 # Usage:
-#   run_deseq2.R --counts=counts_gene.txt --design=design.csv --level=gene --reference=control
+#   run_deseq2.R --counts=counts_gene.txt --design=design.csv --design-formula="~ condition" \
+#                --level=gene --reference=control
 #
 # Inputs
 #   --counts     Bambu count table: counts_gene.txt (GENEID, samples...) for --level=gene,
 #                counts_transcript.txt (TXNAME, GENEID, samples...) for --level transcript
-#   --design     CSV with columns sample,condition
+#   --design     CSV with columns sample,condition and any covariate columns
+#   --design-formula  design formula, last term condition (e.g. "~ batch + condition")
 #   --level      gene | transcript
 #   --reference  reference condition (denominator of every fold change)
 #
@@ -22,17 +24,11 @@ suppressPackageStartupMessages({
     library(ggplot2)
 })
 
-parse_args <- function(args) {
-    # Base-R parser for --key=value arguments (no optparse dependency)
-    out <- list()
-    for (a in args) {
-        if (!grepl("^--[A-Za-z0-9_-]+=", a)) stop(sprintf("Arguments must be given as --key=value (got '%s')", a))
-        out[[sub("^--([^=]+)=.*$", "\\1", a)]] <- sub("^--[^=]+=", "", a)
-    }
-    out
-}
+# Shared helpers (parse_args, design handling) from bin/nli_design.R
+.script <- sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[1])
+source(file.path(dirname(normalizePath(.script)), "nli_design.R"))
 opt <- parse_args(commandArgs(trailingOnly = TRUE))
-for (k in c("counts", "design", "level", "reference")) {
+for (k in c("counts", "design", "design-formula", "level", "reference")) {
     if (is.null(opt[[k]])) stop(sprintf("Missing required argument --%s", k))
 }
 if (!opt$level %in% c("gene", "transcript")) stop("--level must be 'gene' or 'transcript'")
@@ -62,15 +58,13 @@ if (length(missing) > 0) {
 }
 mat <- round(as.matrix(mat[, design$sample, drop = FALSE]))
 
-coldata    <- data.frame(row.names = design$sample, condition = factor(design$condition))
-conditions <- levels(coldata$condition)
 reference  <- opt$reference
-if (length(conditions) > 1) {
-    if (!reference %in% conditions) stop(sprintf("Reference condition '%s' not found in the design", reference))
-    coldata$condition <- relevel(coldata$condition, ref = reference)
-}
-message(sprintf("Level: %s; conditions: %s; reference: %s",
-                opt$level, paste(conditions, collapse = ", "), reference))
+coldata    <- design_coldata(design, opt[["design-formula"]], reference)
+conditions <- levels(coldata$condition)
+formula    <- design_formula(opt[["design-formula"]], coldata)
+check_full_rank(formula, coldata)
+message(sprintf("Level: %s; conditions: %s; reference: %s; design: %s",
+                opt$level, paste(conditions, collapse = ", "), reference, deparse(formula)))
 
 with_ids <- function(df) {
     out <- data.frame(id = rownames(df), stringsAsFactors = FALSE)
@@ -79,8 +73,7 @@ with_ids <- function(df) {
 }
 
 # ---- 2. Model and PCA -----------------------------------------------------------------------
-dds <- DESeqDataSetFromMatrix(countData = mat, colData = coldata,
-                              design = if (length(conditions) > 1) ~ condition else ~ 1)
+dds <- DESeqDataSetFromMatrix(countData = mat, colData = coldata, design = formula)
 
 vsd <- tryCatch(vst(dds, blind = TRUE),
                 error = function(e) varianceStabilizingTransformation(dds, blind = TRUE))

@@ -169,6 +169,15 @@
             "fa_icon": "fas fa-balance-scale",
             "description": "Comparisons for DESeq2, TE DESeq2, IsoformSwitchAnalyzeR and proActiv.",
             "properties": {
+                "design": {
+                    "type": "string",
+                    "default": "~ condition",
+                    "fa_icon": "fas fa-project-diagram",
+                    "pattern": "^~\\s*([A-Za-z][A-Za-z0-9_]*\\s*\\+\\s*)*condition\\s*$",
+                    "description": "Design formula over samplesheet columns, with condition as the last term (e.g. '~ batch + condition').",
+                    "help_text": "Covariates are extra samplesheet columns with categorical values (same naming rules as sample names). Used by DESeq2 (genes, transcripts, TEs), IsoformSwitchAnalyzeR and the DEXSeq usage tests (APA, promoters). SUPPA2 diffSplice cannot use covariates.",
+                    "errorMessage": "--design must look like '~ condition' or '~ batch + condition' (samplesheet columns joined by '+', condition last)"
+                },
                 "reference_condition": {
                     "type": "string",
                     "pattern": "^[A-Za-z][A-Za-z0-9_]*$",

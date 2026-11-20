@@ -25,6 +25,7 @@ process DESEQ2 {
     run_deseq2.R \\
         --counts=${counts} \\
         --design=${design} \\
+        --design-formula='${params.design}' \\
         --level=${level} \\
         --reference=${reference}
 
@@ -69,6 +70,7 @@ process TE_DESEQ2 {
         --te-counts=${te_counts} \\
         --tx-counts=${tx_counts} \\
         --design=${design} \\
+        --design-formula='${params.design}' \\
         --type=${type} \\
         --reference=${reference}
 

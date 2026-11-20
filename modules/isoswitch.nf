@@ -31,6 +31,7 @@ process ISOSWITCH {
         --abundance=${abundance} \\
         --gtf=${iso_gtf} \\
         --design=${design} \\
+        --design-formula='${params.design}' \\
         --reference=${reference} \\
         --alpha=${params.isoswitch_alpha} \\
         --dif-cutoff=${params.isoswitch_dif_cutoff} \\
