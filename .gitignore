@@ -1,6 +1,5 @@
 # Nextflow run files
-.nextflow/
-.nextflow.log*
+.nextflow*
 work/
 results/
 nxf_tmp/
