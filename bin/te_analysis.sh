@@ -21,6 +21,10 @@
 #   isoform_TE_annotation.tsv   one row per (transcript, TE instance) with exonic overlap
 #   isoform_TE_exonization.tsv  strict exonization: pure-intronic novel exons >= 90 % covered by a
 #                               same-strand TE, with junction support at both exon ends
+#                               (exon mode: junction endpoints per exon; span mode: v0.1.0 logic)
+#
+# --te_count_mode span reproduces every v0.1.0 TE output (counts, exonization, row order);
+# isoform_TE_annotation.tsv is produced in both modes (it does not exist in v0.1.0).
 #
 # Only POSIX awk is used (tested with BusyBox awk in the bedtools container).
 
@@ -42,6 +46,9 @@ if [ "$MODE" = span ]; then
     echo "Note: span mode reproduces v0.1.0 counting (same-strand overlap with the whole transcript span);"
     echo "      min_overlap and strand only apply to isoform_TE_annotation.tsv."
 fi
+
+# Multi-file awk programs identify their inputs with command-line assignments (fileno=1 a fileno=2 b);
+# unlike counting FNR == 1, this stays correct when an input file is empty.
 
 # GTF attribute lookup by name (no greedy sed): attr($9, "gene_id")
 AWK_ATTR='
@@ -108,17 +115,40 @@ awk -F '\t' -v OFS='\t' '
 awk -F '\t' -v OFS='\t' '{ len[$4] += $3 - $2 } END { for (t in len) print t, len[t] }' iso_exons.bed > tx_exonic_length.txt
 
 ############################################################
-# 2. Strict exonization (both modes)
+# 2. Strict exonization
 ############################################################
-# Novel exons outside all annotated exons, >= 90 % covered by a same-strand TE, whose left and
-# right boundaries each coincide (+/- 5 bp) with an observed junction endpoint.
+# Novel exons outside all annotated exons and >= 90 % covered by a same-strand TE ...
 bedtools intersect -v -a iso_exons.bed -b ref_exons.bed > iso_pure_intronic_exons.bed
 bedtools intersect -s -f 0.9 -wa -wb -a iso_pure_intronic_exons.bed -b te.bed > exon_overlap_strict.txt
 
+if [ "$MODE" = span ]; then
+# ... span mode (v0.1.0): +/- 5 bp windows around both exon ends must overlap a junction interval, and
+# the transcript ID must occur exactly twice among the supported windows; when a transcript has several
+# strict overlaps, only the last one is kept (data[$4] overwrite). Column names as in v0.1.0.
+awk -v OFS='\t' '{ print $1, $2 - 5, $2 + 5, $4 }' exon_overlap_strict.txt > left_sites.bed
+awk -v OFS='\t' '{ print $1, $3 - 5, $3 + 5, $4 }' exon_overlap_strict.txt > right_sites.bed
+if [ $# -gt 0 ]; then
+    bedtools intersect -u -a left_sites.bed -b "$@" > left_ok.bed || touch left_ok.bed
+    bedtools intersect -u -a right_sites.bed -b "$@" > right_ok.bed || touch right_ok.bed
+else
+    : > left_ok.bed; : > right_ok.bed
+fi
+awk '{ print $4 }' left_ok.bed right_ok.bed | sort | uniq -c | awk '$1 == 2 { print $2 }' > validated_ids.txt
+{
+    printf 'transcript_id\tgene_id\ttx_chr\ttx_start\ttx_end\tTE_id\tTE_chr\tTE_start\tTE_end\t%s\n' "$SAMPLES"
+    awk -F '\t' '
+        fileno == 1 { ok[$1] = 1; next }
+        fileno == 2 { data[$4] = $1 "\t" $2 "\t" $3 "\t" $10 "\t" $7 "\t" $8 "\t" $9; next }
+        fileno == 3 { if ($1 in data && $1 in ok) { printf "%s\t%s\t%s", $1, $2, data[$1]; for (i = 3; i <= NF; i++) printf "\t%s", $i; printf "\n" } }
+    ' fileno=1 validated_ids.txt fileno=2 exon_overlap_strict.txt fileno=3 counts.tsv
+} > isoform_TE_exonization.tsv
+else
+# ... exon mode: each exon boundary must coincide (+/- 5 bp) with an observed junction endpoint
+# (a junction ending at the exon start and one starting at the exon end); every
+# (transcript, exon, TE) combination is reported.
 {
     printf 'transcript_id\tgene_id\texon_chr\texon_start\texon_end\tTE_id\tTE_chr\tTE_start\tTE_end\t%s\n' "$SAMPLES"
     awk -F '\t' -v OFS='\t' '
-        FNR == 1 { fileno++ }
         fileno == 1 { je[$1 SUBSEP $2 SUBSEP $3] = 1; next }
         fileno == 2 {
             # exon: $1-$6, TE: $7-$12. Left boundary needs a junction END, right boundary a junction START.
@@ -139,8 +169,9 @@ bedtools intersect -s -f 0.9 -wa -wb -a iso_pure_intronic_exons.bed -b te.bed > 
                 print line
             }
         }
-    ' junction_ends.txt exon_overlap_strict.txt counts.tsv | sort
+    ' fileno=1 junction_ends.txt fileno=2 exon_overlap_strict.txt fileno=3 counts.tsv | sort
 } > isoform_TE_exonization.tsv
+fi
 echo "Strict exonization rows: $(( $(wc -l < isoform_TE_exonization.tsv) - 1 ))"
 
 ############################################################
@@ -151,13 +182,12 @@ if [ "$STRAND" = sense ]; then STRAND_OPT="-s"; else STRAND_OPT=""; fi
 bedtools intersect $STRAND_OPT -wo -a exons_ranked.bed -b te_full.bed > exon_te_overlap.txt
 
 {
-    printf 'transcript_id\tgene_id\tTE_id\tsubfamily\tfamily\tclass\tTE_chr\tTE_start\tTE_end\tTE_strand\toverlap_bp\tTE_fraction_of_transcript\tstrand_relation\tcategory\tjunction_supported\n'
+    printf 'transcript_id\tgene_id\tTE_id\tsubfamily\tfamily\tclass\tTE_chr\tTE_start\tTE_end\tTE_strand\toverlap_bp\tTE_fraction_of_transcript\tstrand_relation\tcategory\texon_positions\tjunction_supported\n'
     awk -F '\t' -v OFS='\t' -v minov="$MIN_OV" -v afrac="$AUTO_FRAC" '
-        FNR == 1 { fileno++ }
         fileno == 1 { je[$1 SUBSEP $2 SUBSEP $3] = 1; next }
         fileno == 2 { txlen[$1] = $2; next }
         fileno == 3 { if (FNR > 1) gene[$1] = $2; next }
-        {
+        fileno == 4 {
             # exon: $1-$9 (rank $7, n_exons $8, genomic index $9); TE: $10-$18; overlap bp: $19
             k = $4 SUBSEP $13
             if (!(k in tot)) {
@@ -170,6 +200,10 @@ bedtools intersect $STRAND_OPT -wo -a exons_ranked.bed -b te_full.bed > exon_te_
             if ($7 == 1) ovf[k] += $19
             if ($7 == $8) ovl[k] += $19
             if ($7 > 1 && $7 < $8 && $19 > ovi[k]) ovi[k] = $19
+            # Exon positions (in transcription order) touched by this TE
+            if ($7 == 1) pf[k] = 1
+            if ($7 == $8) pl[k] = 1
+            if ($7 > 1 && $7 < $8) pi[k] = 1
             # Splice sites of this exon: left boundary unless genomically first, right unless last
             if ($8 > 1) {
                 ok = 1
@@ -191,10 +225,14 @@ bedtools intersect $STRAND_OPT -wo -a exons_ranked.bed -b te_full.bed > exon_te_
                 else if (ovi[k] + 0 >= minov) cat = "internal_exonization"
                 else                          cat = "other_exonic"
                 g = (a[1] in gene) ? gene[a[1]] : "NA"
-                printf "%s\t%s\t%s\t%d\t%.4f\t%s\t%s\t%s\n", a[1], g, te[k], tot[k], frac, rel[k], cat, sup[k]
+                pos = ""
+                if (k in pf) pos = "first"
+                if (k in pi) pos = pos (pos == "" ? "" : ";") "internal"
+                if (k in pl) pos = pos (pos == "" ? "" : ";") "last"
+                printf "%s\t%s\t%s\t%d\t%.4f\t%s\t%s\t%s\t%s\n", a[1], g, te[k], tot[k], frac, rel[k], cat, pos, sup[k]
             }
         }
-    ' junction_ends.txt tx_exonic_length.txt counts.tsv exon_te_overlap.txt | sort
+    ' fileno=1 junction_ends.txt fileno=2 tx_exonic_length.txt fileno=3 counts.tsv fileno=4 exon_te_overlap.txt | sort
 } > isoform_TE_annotation.tsv
 echo "TE annotation rows (transcript, TE instance): $(( $(wc -l < isoform_TE_annotation.tsv) - 1 ))"
 awk -F '\t' 'NR > 1 { n[$14]++ } END { for (c in n) printf "  %s: %d\n", c, n[c] }' isoform_TE_annotation.tsv | sort
@@ -208,6 +246,7 @@ printf 'TE_id\tTE_chr\tTE_start\tTE_end\t%s\n' "$SAMPLES" > TE_instance_counts.t
 if [ "$MODE" = span ]; then
     # v0.1.0 logic: same-strand overlap of the whole transcript span with a TE; when a transcript
     # overlaps several TEs, only the last overlap reported by bedtools is kept (data[$4] overwrite).
+    # Rows are written in awk's array order, as in v0.1.0 (identical files with the same awk).
     bedtools intersect -s -wa -wb -a isoforms.bed -b te.bed > exon_overlap_general.txt
     awk -F '\t' 'NR == FNR { data[$4] = $1 "\t" $2 "\t" $3 "\t" $10 "\t" $7 "\t" $8 "\t" $9; next }
         ($1 in data) { printf "%s\t%s\t%s", $1, $2, data[$1]; for (i = 3; i <= NF; i++) printf "\t%s", $i; printf "\n" }' \
@@ -215,11 +254,11 @@ if [ "$MODE" = span ]; then
     awk -F '\t' -v n="$NS" '{
         fam = $6; sub(/_dup[0-9]+/, "", fam); for (i = 1; i <= n; i++) sum[fam, i] += $(i + 9); ids[fam] = 1
     } END { for (f in ids) { printf "%s", f; for (j = 1; j <= n; j++) printf "\t%s", (sum[f, j] ? sum[f, j] : 0); printf "\n" } }' \
-        all_joined.tsv | sort >> TE_family_counts.tsv
+        all_joined.tsv >> TE_family_counts.tsv
     awk -F '\t' -v n="$NS" '{
         inst = $6 "\t" $7 "\t" $8 "\t" $9; for (i = 1; i <= n; i++) inst_sum[inst, i] += $(i + 9); locs[inst] = 1
     } END { for (l in locs) { printf "%s", l; for (j = 1; j <= n; j++) printf "\t%s", (inst_sum[l, j] ? inst_sum[l, j] : 0); printf "\n" } }' \
-        all_joined.tsv | sort >> TE_instance_counts.tsv
+        all_joined.tsv >> TE_instance_counts.tsv
 else
     # Exon mode: (transcript, TE) pairs from the annotation (exonic overlap >= MIN_OVERLAP). Each
     # transcript contributes its reads once per subfamily and once per TE instance.

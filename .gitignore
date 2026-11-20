@@ -1,0 +1,38 @@
+# Nextflow run files
+.nextflow/
+.nextflow.log*
+work/
+results/
+nxf_tmp/
+trace.txt
+timeline.html
+dag.html
+*.html
+*.log
+
+# Singularity/Apptainer cache (large pulled images)
+singularity_cache/
+*.sif
+
+# Local run outputs
+demo_results/
+pacbio_results/
+nanopore_results/
+benchmark/
+NextLongIso_v1.0.0/
+NextLongIso_v1.0.0.tar.gz
+
+# Reference data (large fasta/gtf - users override via params)
+data/genome/*.fa
+data/genome/*.fa.fai
+data/genome/*.fa.gz
+data/genome/*.gtf
+data/genome/*.gtf.gz
+data/genome/*.bed
+
+# Test data (hosted on Zenodo; regenerate locally with tests/make_test_data.sh)
+tests/data/
+
+# OS files
+.DS_Store
+Thumbs.db

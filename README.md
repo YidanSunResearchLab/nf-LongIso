@@ -52,11 +52,15 @@ cd nf-LongIso
 
 You can also run a released version directly, without cloning: `nextflow run YidanSunResearchLab/nf-LongIso -r v0.2.0 ...`.
 
-**3. Check the installation** (tiny test dataset, about 2 minutes once the containers are downloaded; run from the repository root):
+**3. Check the installation** (tiny test dataset of ~16 MB downloaded from Zenodo; about 2 minutes once the containers are downloaded; works from any directory):
 
 ```bash
-nextflow run main.nf -profile test,singularity --outdir results_test
+nextflow run YidanSunResearchLab/nf-LongIso -r v0.2.0 -profile test,singularity --outdir results_test
+# or, from a clone:
+nextflow run /path/to/nf-LongIso/main.nf -profile test,singularity --outdir results_test
 ```
+
+The test data (record https://zenodo.org/records/ZENODO_RECORD_ID) are cut from the demo run by `tests/make_test_data.sh`; they are not stored in the repository.
 
 🚀 **Quick Start for demo test**
 
@@ -231,11 +235,14 @@ With `--te_gtf`, NextLongIso links Bambu isoforms to transposable elements (TEs)
 | Overlap tested | Isoform **exons** vs TE, at least `--te_min_overlap` bp (default 20) | Whole isoform **span** (first to last base, including introns) vs TE |
 | Strand | `--te_strand sense` (default) or `both` | Same strand only |
 | Isoform overlapping several TEs | Counted once for each TE subfamily / instance it overlaps | Counted for only one of them (the last overlap reported) |
-| Use | Recommended for new analyses | Reproduces results produced with v0.1.0 |
+| `isoform_TE_exonization.tsv` | Junction **endpoints** at both exon boundaries, every TE per transcript | v0.1.0 test (junction intervals near both ends; one TE per transcript) |
+| Use | Recommended for new analyses | Reproduces **all** v0.1.0 TE outputs (counts, exonization table, TE DE) |
 
 **Why the default changed.** A TE inside an intron is not part of the mature transcript, but the span mode counts every read of the host transcript for it. Span-mode TE counts therefore largely mirror host-gene expression (see `docs/te_count_mode_comparison.md`), whereas the exon mode only counts transcripts that actually contain TE sequence, and counts each one for every subfamily/instance it contains.
 
-Both modes produce `TE_family_counts.tsv` and `TE_instance_counts.tsv` with the same columns, and the same TE differential expression. Independently of the mode, `TE/isoform_TE_annotation.tsv` lists every (isoform, TE instance) pair with an exonic overlap ≥ `--te_min_overlap`, with the TE subfamily, family and class, the overlap length, the TE fraction of the isoform, the strand relation, whether the overlapped exons' splice sites are supported by observed junctions, and a category (first match wins):
+Both modes produce `TE_family_counts.tsv` and `TE_instance_counts.tsv` with the same columns, and the same TE differential expression. Independently of the mode (it is new in v0.2.0), `TE/isoform_TE_annotation.tsv` lists every (isoform, TE instance) pair whose exonic overlap, summed over the isoform's exons, is ≥ `--te_min_overlap`, with the TE subfamily, family and class, the coordinates, the overlap length, the TE fraction of the isoform, the strand relation (`--te_strand both` also reports antisense TEs), a category, `exon_positions` and `junction_supported`.
+
+`category` is assigned by the first rule that applies, in this order of priority. Each exon-level rule is evaluated for one exon at a time: that exon alone must overlap the TE by at least `--te_min_overlap` bp. First and last exon are defined in transcription order (on the minus strand the first exon is the rightmost one), not by `exon_number`.
 
 | Category | Definition |
 |---|---|
@@ -243,11 +250,13 @@ Both modes produce `TE_family_counts.tsv` and `TE_instance_counts.tsv` with the 
 | `TSS` | The TE overlaps the first exon (in transcription order) by ≥ `--te_min_overlap` bp |
 | `PAS` | The TE overlaps the last exon by ≥ `--te_min_overlap` bp |
 | `internal_exonization` | The TE overlaps an internal exon by ≥ `--te_min_overlap` bp |
-| `other_exonic` | The overlap only reaches the threshold when summed over several exons |
+| `other_exonic` | No single exon overlaps the TE by `--te_min_overlap` bp; the pair only reaches the threshold when the overlaps of several exons are added up (e.g. a TE spanning an intron and touching the ends of two exons by a few bp each) |
 
-`TE/isoform_TE_exonization.tsv` keeps the strict definition of TE exonization: a novel exon outside all annotated exons, at least 90 % covered by a same-strand TE, whose two boundaries both match junctions observed in the reads (±5 bp). With BAM input, junctions are extracted as well, so this works for both input types.
+`exon_positions` lists every exon position the TE touches (any overlap, `first`, `internal`, `last`, separated by `;`; a single-exon isoform is `first;last`), so overlaps that did not decide the category are still visible. `junction_supported` is `yes` when every splice site of the touched exons matches an observed junction (±5 bp), `no` otherwise, and `NA` for single-exon isoforms.
 
-**Reproducing v0.1.0 TE results**: add `--te_count_mode span`, or run the original release with `-r v0.1.0` (see Citation).
+`TE/isoform_TE_exonization.tsv` keeps the strict definition of TE exonization: a novel exon outside all annotated exons, at least 90 % covered by a same-strand TE, whose two boundaries both match junctions observed in the reads (±5 bp). In exon mode each boundary must match a junction **endpoint**, so novel terminal exons (a TE-derived first or last exon has only one splice site) are not listed here; they appear in `isoform_TE_annotation.tsv` as `TSS`, `PAS` or `autonomous`. Span mode uses the v0.1.0 test unchanged. With BAM input, junctions are extracted as well, so this works for both input types.
+
+**Reproducing v0.1.0 TE results**: add `--te_count_mode span`. On the demo data, every file that v0.1.0 writes to `TE/` is reproduced (see `docs/dev/v0.2.0_vs_v0.1.0.md`); only `isoform_TE_annotation.tsv` is additional. Alternatively, run the original release with `-r v0.1.0` (see Citation).
 
 📂 **Output**
 

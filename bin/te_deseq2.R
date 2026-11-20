@@ -81,8 +81,11 @@ if (length(conditions) > 1) {
         fname <- if (length(conditions) == 2) sprintf("DE_TE_%s_results.csv", type) else
             sprintf("DE_TE_%s_results_%s_vs_%s.csv", type, cond, reference)
         write.csv(merge(te_meta, res, by = "ID_JOIN"), fname, row.names = FALSE)
-        print(ggplot(res, aes(x = log2FoldChange, y = -log10(pvalue), color = padj < 0.05)) +
-              geom_point(alpha = 0.4) + theme_minimal() + ggtitle(sprintf("TE %s: %s vs %s", type, cond, reference)))
+        p <- ggplot(res, aes(x = log2FoldChange, y = -log10(pvalue), color = padj < 0.05)) +
+             geom_point(alpha = 0.4) + theme_minimal()
+        # One page per comparison; with two conditions the plot is drawn exactly as in v0.1.0 (no title)
+        if (length(conditions) > 2) p <- p + ggtitle(sprintf("TE %s: %s vs %s", type, cond, reference))
+        print(p)
         message(sprintf("TE %s, %s vs %s: %d with padj < 0.05", type, cond, reference, sum(res$padj < 0.05, na.rm = TRUE)))
     }
     invisible(dev.off())

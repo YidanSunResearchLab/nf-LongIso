@@ -17,6 +17,11 @@
 #
 # <demo_bam_dir> must contain {GM12878,H1}_demo_rep{1,2}.sorted.bam (+ .bai), i.e. the
 # results/minimap2/ directory of a demo run.
+#
+# The published copy of this dataset is on Zenodo (see conf/test.config); its files are genome.fa,
+# genes.gtf, te.gtf and reads/*.fastq.gz from <outdir> (uploaded without the reads/ folder). The
+# samplesheet written here uses local paths (tests/data/...); tests/samplesheet_test.csv uses the URLs.
+# <outdir> = tests/data is git-ignored.
 
 set -eu
 
@@ -84,7 +89,6 @@ awk -F '\t' -v OFS='\t' '
         return 0
     }
     BEGIN { nkeys = split("gene_id transcript_id gene_type gene_name transcript_type transcript_name", keys, " ") }
-    FNR == 1 { fileno++ }
     fileno == 1 { split($0, a, " "); nw++; wc[nw] = a[1]; ws[nw] = a[2]; we[nw] = a[3]; wn[nw] = a[4]; next }
     fileno == 2 {
         if ($3 == "transcript" && win($1, $4, $5)) { keep_tx[attr($9, "transcript_id")] = 1; keep_gene[attr($9, "gene_id")] = 1 }
@@ -108,11 +112,10 @@ awk -F '\t' -v OFS='\t' '
         $9 = a
         print
     }
-' "$TMP/offsets.txt" "$TMP/genes.chr.gtf" "$TMP/genes.chr.gtf" > "$OUT/genes.gtf"
+' fileno=1 "$TMP/offsets.txt" fileno=2 "$TMP/genes.chr.gtf" fileno=3 "$TMP/genes.chr.gtf" > "$OUT/genes.gtf"
 
 # 3. TE annotation: records entirely inside a window
 awk -F '\t' -v OFS='\t' '
-    FNR == 1 { fileno++ }
     fileno == 1 { split($0, a, " "); nw++; wc[nw] = a[1]; ws[nw] = a[2]; we[nw] = a[3]; wn[nw] = a[4]; next }
     {
         for (i = 1; i <= nw; i++) {
@@ -121,7 +124,7 @@ awk -F '\t' -v OFS='\t' '
             }
         }
     }
-' "$TMP/offsets.txt" "$TE_GTF" > "$OUT/te.gtf"
+' fileno=1 "$TMP/offsets.txt" fileno=2 "$TE_GTF" > "$OUT/te.gtf"
 
 # 4. Reads: primary alignments overlapping the windows, as FASTQ
 REGIONS=$(awk '{ printf "%s:%s-%s ", $1, $2, $3 }' "$TMP/windows.txt")

@@ -100,9 +100,11 @@ exactly twice in the combined "left ok" + "right ok" list. On the synthetic locu
 | N1 | two novel intronic exons, each fully covered by a TE (AluY, L1M), both ends of both exons matched by observed junctions | 2 rows | **0 rows** (the ID occurs 4 times, not 2) | 2 rows |
 | N3 | novel intronic exon fully covered by MER5A; the only junction skips the exon (spans it) | 0 rows | **1 row** (a spanning junction overlaps both windows) | 0 rows |
 
-v0.2.0 validates each exon separately and requires an observed junction **endpoint** within
-±5 bp of each exon boundary (a junction ending at the exon start and one starting at the exon
-end), and keeps every (transcript, exon, TE) combination instead of one TE per transcript.
+In exon mode (the default), v0.2.0 validates each exon separately and requires an observed junction
+**endpoint** within ±5 bp of each exon boundary (a junction ending at the exon start and one starting
+at the exon end), and keeps every (transcript, exon, TE) combination instead of one TE per transcript.
+`--te_count_mode span` keeps the v0.1.0 test unchanged, so that all v0.1.0 TE outputs can be
+reproduced (it reports N3 and not N1 on this locus, exactly like v0.1.0).
 
 The same test confirms that `--te_count_mode span` reproduces the v0.1.0 family and instance
 counts (including the v0.1.0 behaviour that a transcript overlapping several TEs contributes

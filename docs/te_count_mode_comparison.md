@@ -7,13 +7,14 @@ NextLongIso v0.2.0 counts TE expression in two ways (`--te_count_mode`):
   once per TE instance it contains.
 * **span** (v0.1.0): an isoform is counted for a TE that overlaps its **span** (first to last base,
   including introns) on the same strand; when several TEs overlap, only the last one reported by
-  bedtools receives the counts.
+  bedtools receives the counts. Span mode also keeps the v0.1.0 exonization test, so every v0.1.0 TE
+  output is reproduced.
 
 ## Data and commands
 
 Demo data (GM12878 ×2 vs H1 ×2, 10,000 long reads per sample), GRCh38, GENCODE annotation and
 `TEtranscript_hg38_rmsk_TE.gtf`; runs `demo_v0.2.0` (exon) and `demo_v0.2.0_span` (span, `-resume`), see
-`docs/dev/v0.2.0_vs_v0.1.0.md`. The span run's TE counts and TE DESeq2 results are identical to v0.1.0.
+`docs/dev/v0.2.0_vs_v0.1.0.md`. The span run's TE outputs reproduce v0.1.0 (file-by-file comparison there).
 
 ```bash
 # host genes of each subfamily (bedtools container)
@@ -40,7 +41,9 @@ python3 tests/compare_te_modes.py --exon demo_v0.2.0 --span demo_v0.2.0_span \
    (its top-20 list consists of ties at padj 0.925), and the two top-20 lists share no subfamily.
 4. **Categories** (`isoform_TE_annotation.tsv`): most TE-containing isoforms carry the TE in their last
    exon (PAS, 51.8 % of isoform-TE pairs), followed by internal exons (23.7 %), first exons (TSS, 20.7 %) and
-   TE-dominated (autonomous, 3.8 %) isoforms.
+   TE-dominated (autonomous, 3.8 %) isoforms. The `exon_positions` column shows which exons a TE touches
+   regardless of the category: last 138,606, internal 60,487, first 43,931, first;last 10,614,
+   internal;last 989, first;internal 831, first;internal;last 22 isoform-TE pairs.
 
 Caveat: the demo has only 10,000 reads per sample, so absolute numbers are small; the comparison should
 be repeated on a full dataset before drawing biological conclusions.
