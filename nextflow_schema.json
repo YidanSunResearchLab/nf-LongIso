@@ -393,6 +393,37 @@
             },
             "description": "Promoters from transcript 5' ends (--promoter_method tss, default) or junction-based proActiv."
         },
+        "qc_options": {
+            "title": "Read QC and transcript classification options",
+            "type": "object",
+            "fa_icon": "fas fa-clipboard-check",
+            "description": "Read-level QC (NanoPlot, seqkit) and SQANTI3 structural classification.",
+            "properties": {
+                "skip_read_qc": {
+                    "type": "boolean",
+                    "default": false,
+                    "fa_icon": "fas fa-forward",
+                    "description": "Skip NanoPlot and seqkit stats on the input reads.",
+                    "help_text": "Read QC runs only for FASTQ input; it is never run for BAM input."
+                },
+                "run_sqanti3": {
+                    "type": "boolean",
+                    "default": false,
+                    "fa_icon": "fas fa-toggle-off",
+                    "description": "Classify the Bambu transcripts with SQANTI3 QC (FSM, ISM, NIC, NNC, ...).",
+                    "help_text": "Uses the official SQANTI3 container (anaconesalab/sqanti3:v6.0.1, about 7.5 GB). Only sqanti3_qc.py is run (no filter or rescue)."
+                },
+                "sqanti3_args": {
+                    "type": "string",
+                    "default": "",
+                    "fa_icon": "fas fa-terminal",
+                    "pattern": "^[^'\"]*$",
+                    "description": "Extra sqanti3_qc.py options, e.g. '--report skip' or '--CAGE_peak <bed>'.",
+                    "help_text": "Do not set the options given by the pipeline (--isoforms, --refGTF, --refFasta, --output, --dir, --cpus).",
+                    "errorMessage": "--sqanti3_args must not contain quotes"
+                }
+            }
+        },
         "te_options": {
             "title": "Transposable element options",
             "type": "object",
@@ -520,6 +551,9 @@
         },
         {
             "$ref": "#/$defs/promoter_options"
+        },
+        {
+            "$ref": "#/$defs/qc_options"
         },
         {
             "$ref": "#/$defs/te_options"

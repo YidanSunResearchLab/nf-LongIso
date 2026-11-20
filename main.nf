@@ -21,6 +21,8 @@ include { SOFTWARE_VERSIONS; MULTIQC }                                         f
 include { MAKE_DESIGN }                                                        from './modules/design.nf'
 include { APA }                                                                from './modules/apa.nf'
 include { PROMOTER_TSS }                                                       from './modules/promoter.nf'
+include { NANOPLOT; SEQKIT_STATS }                                             from './modules/read_qc.nf'
+include { SQANTI3_QC }                                                         from './modules/sqanti3.nf'
 
 /*
  * Covariates of --design ('~ condition' or '~ cov1 + cov2 + condition'), in formula order.
@@ -120,11 +122,14 @@ workflow {
           minimap2            : ${params.input_type == 'fastq' ? "preset=${params.minimap2_preset}, junc_bed=${params.minimap2_junc_bed}, index=${params.minimap2_index ?: 'built by the pipeline'}, args='${params.minimap2_args}'" : 'not used (BAM input)'}
           Tool arguments      : bamCoverage='${params.bamcoverage_args}', bambu='${params.bambu_args}', SUPPA2 events='${params.suppa2_events}'
           SUPPA2 diffSplice   : ${!params.suppa2_diff ? 'off' : diff_conditions ? "${diff_conditions.join(', ')} vs ${reference}; ${params.suppa2_diff_args}" : 'skipped (needs >= 2 replicates in the reference and another condition)'}
+          Read QC             : ${params.input_type != 'fastq' ? 'not run (BAM input)' : params.skip_read_qc ? 'skipped (--skip_read_qc)' : 'NanoPlot, seqkit stats'}
+          SQANTI3 QC          : ${params.run_sqanti3 ? 'on' + (params.sqanti3_args ? " (${params.sqanti3_args})" : '') : 'off (--run_sqanti3 to enable)'}
           proActiv            : species=${params.proactiv_species}; ${params.proactiv_altprom_args}
           Output directory    : ${params.outdir}
         """.stripIndent()
     ch_input = channel.fromList(samples)
     ch_versions = channel.empty()
+    ch_read_qc  = channel.empty()
 
     // Normalised design table (sample,condition) used by all R steps
     def design_lines = [ (['sample', 'condition'] + covariates).join(',') ] +
@@ -144,6 +149,14 @@ workflow {
         ch_versions = ch_versions.mix(MINIMAP2_ALIGN.out.versions)
         if (!params.minimap2_index) ch_versions = ch_versions.mix(MINIMAP2_INDEX.out.versions)
         if (params.minimap2_junc_bed) ch_versions = ch_versions.mix(JUNC_BED.out.versions)
+
+        // Read QC (FASTQ input only)
+        if (!params.skip_read_qc) {
+            NANOPLOT(ch_input)
+            SEQKIT_STATS(ch_input)
+            ch_read_qc  = ch_read_qc.mix(NANOPLOT.out.stats.map { _meta, f -> f }, SEQKIT_STATS.out.stats.map { _meta, f -> f })
+            ch_versions = ch_versions.mix(NANOPLOT.out.versions, SEQKIT_STATS.out.versions)
+        }
     } else {
         ch_bam_in = ch_input.map { meta, bam ->
             def bai = [ file("${bam}.bai"), file("${bam.parent}/${bam.baseName}.bai") ].find { f -> f.exists() }
@@ -248,13 +261,20 @@ workflow {
 
     ch_versions = ch_versions.mix(ch_promoter_versions)
 
-    // 8. SOFTWARE VERSIONS AND MULTIQC (inputs come from channels, not from the output directory)
+    // 8. TRANSCRIPT CLASSIFICATION (optional): SQANTI3 QC of the Bambu extended annotation
+    if (params.run_sqanti3) {
+        SQANTI3_QC(ch_extended_gtf, file(params.gtf), file(params.genome), ch_fai)
+        ch_versions = ch_versions.mix(SQANTI3_QC.out.versions)
+    }
+
+    // 9. SOFTWARE VERSIONS AND MULTIQC (inputs come from channels, not from the output directory)
     SOFTWARE_VERSIONS(ch_versions.collect())
     ch_multiqc = channel.empty().mix(
         SAMTOOLS_STATS.out.stats.map { _meta, f -> f },
         SAMTOOLS_STATS.out.flagstat.map { _meta, f -> f },
         DESEQ2_GENE.out.mqc,
         DESEQ2_TRANSCRIPT.out.mqc,
+        ch_read_qc,
         SOFTWARE_VERSIONS.out.mqc
     )
     MULTIQC(ch_multiqc.collect())
