@@ -2,10 +2,10 @@
 # NextLongIso: differential expression with DESeq2 at gene or transcript level.
 #
 # Usage:
-#   deseq2.R --counts counts_gene.txt --design design.csv --level gene --reference control
+#   run_deseq2.R --counts=counts_gene.txt --design=design.csv --level=gene --reference=control
 #
 # Inputs
-#   --counts     Bambu count table: counts_gene.txt (GENEID, samples...) for --level gene,
+#   --counts     Bambu count table: counts_gene.txt (GENEID, samples...) for --level=gene,
 #                counts_transcript.txt (TXNAME, GENEID, samples...) for --level transcript
 #   --design     CSV with columns sample,condition
 #   --level      gene | transcript
@@ -23,9 +23,13 @@ suppressPackageStartupMessages({
 })
 
 parse_args <- function(args) {
-    if (length(args) %% 2 != 0) stop("Arguments must be given as --key value pairs")
-    keys <- sub("^--", "", args[c(TRUE, FALSE)])
-    setNames(as.list(args[c(FALSE, TRUE)]), keys)
+    # Base-R parser for --key=value arguments (no optparse dependency)
+    out <- list()
+    for (a in args) {
+        if (!grepl("^--[A-Za-z0-9_-]+=", a)) stop(sprintf("Arguments must be given as --key=value (got '%s')", a))
+        out[[sub("^--([^=]+)=.*$", "\\1", a)]] <- sub("^--[^=]+=", "", a)
+    }
+    out
 }
 opt <- parse_args(commandArgs(trailingOnly = TRUE))
 for (k in c("counts", "design", "level", "reference")) {

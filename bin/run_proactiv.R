@@ -2,8 +2,8 @@
 # NextLongIso: promoter activity (proActiv) from long-read junctions.
 #
 # Usage:
-#   proactiv.R --gtf cleaned_annotations.gtf --design design.csv --species Homo_sapiens \
-#              --reference control --altprom-args-file altprom_args.txt --cpus 8
+#   run_proactiv.R --gtf=cleaned_annotations.gtf --design=design.csv --species=Homo_sapiens \
+#              --reference=control --altprom-args-file=altprom_args.txt --cpus=8
 #
 # BAM files (<sample>.sorted.bam) are read from the working directory. Junctions are
 # converted to STAR SJ.out.tab format, which proActiv accepts as input.
@@ -20,9 +20,13 @@ suppressPackageStartupMessages({
 })
 
 parse_args <- function(args) {
-    if (length(args) %% 2 != 0) stop("Arguments must be given as --key value pairs")
-    keys <- sub("^--", "", args[c(TRUE, FALSE)])
-    setNames(as.list(args[c(FALSE, TRUE)]), keys)
+    # Base-R parser for --key=value arguments (no optparse dependency)
+    out <- list()
+    for (a in args) {
+        if (!grepl("^--[A-Za-z0-9_-]+=", a)) stop(sprintf("Arguments must be given as --key=value (got '%s')", a))
+        out[[sub("^--([^=]+)=.*$", "\\1", a)]] <- sub("^--[^=]+=", "", a)
+    }
+    out
 }
 opt <- parse_args(commandArgs(trailingOnly = TRUE))
 for (k in c("gtf", "design", "species", "reference", "altprom-args-file", "cpus")) {

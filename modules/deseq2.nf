@@ -1,5 +1,5 @@
 /*
- * Differential expression (DESeq2). R code: bin/deseq2.R and bin/te_deseq2.R
+ * Differential expression (DESeq2). R code: bin/run_deseq2.R and bin/run_te_deseq2.R
  */
 
 process DESEQ2 {
@@ -22,11 +22,11 @@ process DESEQ2 {
 
     script:
     """
-    deseq2.R \\
-        --counts ${counts} \\
-        --design ${design} \\
-        --level ${level} \\
-        --reference ${reference}
+    run_deseq2.R \\
+        --counts=${counts} \\
+        --design=${design} \\
+        --level=${level} \\
+        --reference=${reference}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -65,12 +65,12 @@ process TE_DESEQ2 {
 
     script:
     """
-    te_deseq2.R \\
-        --te-counts ${te_counts} \\
-        --tx-counts ${tx_counts} \\
-        --design ${design} \\
-        --type ${type} \\
-        --reference ${reference}
+    run_te_deseq2.R \\
+        --te-counts=${te_counts} \\
+        --tx-counts=${tx_counts} \\
+        --design=${design} \\
+        --type=${type} \\
+        --reference=${reference}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

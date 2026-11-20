@@ -5,8 +5,8 @@
 # estimated from the whole transcriptome (same model as v0.1.0).
 #
 # Usage:
-#   te_deseq2.R --te-counts TE_family_counts.tsv --tx-counts counts_transcript.txt \
-#               --design design.csv --type Family --reference control
+#   run_te_deseq2.R --te-counts=TE_family_counts.tsv --tx-counts=counts_transcript.txt \
+#               --design=design.csv --type=Family --reference=control
 #
 # Outputs (<type> = Family or Instance)
 #   DE_TE_<type>_results.csv                  (exactly 2 conditions)
@@ -19,9 +19,13 @@ suppressPackageStartupMessages({
 })
 
 parse_args <- function(args) {
-    if (length(args) %% 2 != 0) stop("Arguments must be given as --key value pairs")
-    keys <- sub("^--", "", args[c(TRUE, FALSE)])
-    setNames(as.list(args[c(FALSE, TRUE)]), keys)
+    # Base-R parser for --key=value arguments (no optparse dependency)
+    out <- list()
+    for (a in args) {
+        if (!grepl("^--[A-Za-z0-9_-]+=", a)) stop(sprintf("Arguments must be given as --key=value (got '%s')", a))
+        out[[sub("^--([^=]+)=.*$", "\\1", a)]] <- sub("^--[^=]+=", "", a)
+    }
+    out
 }
 opt <- parse_args(commandArgs(trailingOnly = TRUE))
 for (k in c("te-counts", "tx-counts", "design", "type", "reference")) {

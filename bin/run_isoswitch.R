@@ -3,9 +3,9 @@
 # poly(A)-site (APA) usage from Bambu isoforms.
 #
 # Usage:
-#   isoswitch.R --counts counts_transcript.txt --abundance CPM_transcript.txt \
-#               --gtf extended_annotations.gtf --design design.csv --reference control \
-#               --alpha 0.05 --dif-cutoff 0.1 --seed 42
+#   run_isoswitch.R --counts=counts_transcript.txt --abundance=CPM_transcript.txt \
+#               --gtf=extended_annotations.gtf --design=design.csv --reference=control \
+#               --alpha=0.05 --dif-cutoff=0.1 --seed=42
 #
 # Every non-reference condition is compared with the reference (condition_1 = reference,
 # condition_2 = other condition; dIF and dPAU are condition_2 - condition_1).
@@ -26,9 +26,13 @@ suppressPackageStartupMessages({
 })
 
 parse_args <- function(args) {
-    if (length(args) %% 2 != 0) stop("Arguments must be given as --key value pairs")
-    keys <- sub("^--", "", args[c(TRUE, FALSE)])
-    setNames(as.list(args[c(FALSE, TRUE)]), keys)
+    # Base-R parser for --key=value arguments (no optparse dependency)
+    out <- list()
+    for (a in args) {
+        if (!grepl("^--[A-Za-z0-9_-]+=", a)) stop(sprintf("Arguments must be given as --key=value (got '%s')", a))
+        out[[sub("^--([^=]+)=.*$", "\\1", a)]] <- sub("^--[^=]+=", "", a)
+    }
+    out
 }
 opt <- parse_args(commandArgs(trailingOnly = TRUE))
 for (k in c("counts", "abundance", "gtf", "design", "reference", "alpha", "dif-cutoff", "seed")) {

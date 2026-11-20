@@ -1,5 +1,5 @@
 /*
- * Isoform switching, alternative TSS/TTS and APA (IsoformSwitchAnalyzeR). R code: bin/isoswitch.R
+ * Isoform switching, alternative TSS/TTS and APA (IsoformSwitchAnalyzeR). R code: bin/run_isoswitch.R
  */
 
 process ISOSWITCH {
@@ -26,15 +26,15 @@ process ISOSWITCH {
 
     script:
     """
-    isoswitch.R \\
-        --counts ${counts} \\
-        --abundance ${abundance} \\
-        --gtf ${iso_gtf} \\
-        --design ${design} \\
-        --reference ${reference} \\
-        --alpha ${params.isoswitch_alpha} \\
-        --dif-cutoff ${params.isoswitch_dif_cutoff} \\
-        --seed ${params.seed}
+    run_isoswitch.R \\
+        --counts=${counts} \\
+        --abundance=${abundance} \\
+        --gtf=${iso_gtf} \\
+        --design=${design} \\
+        --reference=${reference} \\
+        --alpha=${params.isoswitch_alpha} \\
+        --dif-cutoff=${params.isoswitch_dif_cutoff} \\
+        --seed=${params.seed}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

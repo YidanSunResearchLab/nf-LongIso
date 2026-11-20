@@ -1,5 +1,5 @@
 /*
- * Promoter activity and alternative promoters (proActiv). R code: bin/proactiv.R
+ * Promoter activity and alternative promoters (proActiv). R code: bin/run_proactiv.R
  */
 
 process PROACTIV {
@@ -25,18 +25,18 @@ process PROACTIV {
     # Keep only stranded records (makeTxDbFromGFF rejects strand '.')
     awk -F '\\t' '\$7 == "+" || \$7 == "-"' ${gtf} > cleaned_annotations.gtf
 
-    # getAlternativePromoters() arguments, written verbatim (parsed as R by proactiv.R)
+    # getAlternativePromoters() arguments, written verbatim (parsed as R by run_proactiv.R)
     cat <<'ALTPROM_ARGS' > altprom_args.txt
     ${args}
     ALTPROM_ARGS
 
-    proactiv.R \\
-        --gtf cleaned_annotations.gtf \\
-        --design ${design} \\
-        --species ${params.proactiv_species} \\
-        --reference ${reference} \\
-        --altprom-args-file altprom_args.txt \\
-        --cpus ${task.cpus}
+    run_proactiv.R \\
+        --gtf=cleaned_annotations.gtf \\
+        --design=${design} \\
+        --species=${params.proactiv_species} \\
+        --reference=${reference} \\
+        --altprom-args-file=altprom_args.txt \\
+        --cpus=${task.cpus}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

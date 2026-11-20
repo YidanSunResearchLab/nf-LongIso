@@ -18,17 +18,8 @@ process SUPPA2 {
 
     script:
     """
-    # SUPPA2 expression file: header = sample names only; rows = transcript ID + values.
-    # Transcript IDs are kept exactly as in the Bambu GTF (including versions such as
-    # ENST00000456328.2), so that they match the transcript IDs in the .ioe event files.
-    awk 'BEGIN { FS = OFS = "\\t" }
-        NR == 1 {
-            out = ""
-            for (i = 3; i <= NF; i++) { n = \$i; sub(/[.]sorted([.]bam)?\$/, "", n); out = out (i > 3 ? OFS : "") n }
-            print out
-            next
-        }
-        { out = \$1; for (i = 3; i <= NF; i++) out = out OFS \$i; print out }' ${counts} > expression.tsv
+    # SUPPA2 expression file (transcript IDs kept exactly as in the Bambu GTF; bin/suppa2_expression.awk)
+    awk -f "\$(command -v suppa2_expression.awk)" ${counts} > expression.tsv
     echo "Expression file: \$(( \$(wc -l < expression.tsv) - 1 )) transcripts; samples: \$(head -n 1 expression.tsv | tr '\\t' ' ')"
 
     suppa.py generateEvents -i ${gtf} -f ioe -e ${params.suppa2_events} -o events
@@ -39,14 +30,10 @@ process SUPPA2 {
         prefix=\$(basename "\$ioe_file" _strict.ioe)
         suppa.py psiPerEvent -i "\$ioe_file" -e expression.tsv -o "psi/\${prefix}_samples"
 
-        # Keep events with a PSI value (not nan) in at least 2 samples; data rows are
-        # event_id + one column per sample (the header has the sample names only)
+        # Keep events with a PSI value (not nan) in at least 2 samples (bin/psi_min_samples.awk)
         psi_file="psi/\${prefix}_samples.psi"
         if [ -s "\$psi_file" ]; then
-            awk 'BEGIN { FS = "\\t" }
-                NR == 1 { print; next }
-                { n = 0; for (i = 2; i <= NF; i++) if (\$i != "nan" && \$i != "NA" && \$i != "") n++; if (n >= 2) print }' \\
-                "\$psi_file" > "psi/\${prefix}_samples_filtered.psi"
+            awk -v min=2 -f "\$(command -v psi_min_samples.awk)" "\$psi_file" > "psi/\${prefix}_samples_filtered.psi"
             echo "\$prefix: \$(( \$(wc -l < "\$psi_file") - 1 )) events, \$(( \$(wc -l < "psi/\${prefix}_samples_filtered.psi") - 1 )) with PSI in >= 2 samples"
         fi
     done
