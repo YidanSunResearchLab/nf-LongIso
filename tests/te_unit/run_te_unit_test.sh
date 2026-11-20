@@ -53,4 +53,16 @@ if [ "$(cut -f1-15 "$WORK/nojunc/isoform_TE_annotation.tsv" | normalise /dev/std
 else
     echo "FAIL  nojunc (empty junction input)"; cat "$WORK/nojunc/isoform_TE_annotation.tsv" "$WORK/nojunc/isoform_TE_exonization.tsv"; status=1
 fi
+# Strand-aware junction support: junctions on the opposite strand ('-') do not support the '+'
+# transcripts (no exonization row for N1); junctions with unknown strand ('.') do
+run minus exon sense "$HERE/s1_minus.junctions.bed"
+run unknown exon sense "$HERE/s1_unknown.junctions.bed"
+n_minus=$(tail -n +2 "$WORK/minus/isoform_TE_exonization.tsv" | wc -l)
+n_unknown=$(tail -n +2 "$WORK/unknown/isoform_TE_exonization.tsv" | wc -l)
+sup_minus=$(awk -F '\t' '$1 == "N1" && $3 == "AluY_dup1" { print $16 }' "$WORK/minus/isoform_TE_annotation.tsv")
+if [ "$n_minus" -eq 0 ] && [ "$n_unknown" -eq 2 ] && [ "$sup_minus" = "no" ]; then
+    echo "PASS  strand (opposite-strand junctions ignored, '.' accepted)"
+else
+    echo "FAIL  strand: exonization rows minus=$n_minus (expected 0) unknown=$n_unknown (expected 2); N1/AluY support with '-' junctions: $sup_minus (expected no)"; status=1
+fi
 exit $status

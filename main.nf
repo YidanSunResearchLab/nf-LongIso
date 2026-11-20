@@ -8,7 +8,7 @@
 
 include { validateParameters; paramsSummaryLog; samplesheetToList } from 'plugin/nf-schema'
 
-include { MINIMAP2_INDEX; JUNC_BED; MINIMAP2_ALIGN; SAMTOOLS_INDEX;
+include { MINIMAP2_INDEX; JUNC_BED; MINIMAP2_ALIGN; SAMTOOLS_INDEX; SAMTOOLS_FAIDX; GTF_INTRONS;
           SAMTOOLS_STATS; EXTRACT_JUNCTIONS; MAKE_BIGWIG }                    from './modules/align.nf'
 include { BAMBU_PREP; BAMBU }                                                  from './modules/bambu.nf'
 include { SUPPA2 }                                                             from './modules/suppa2.nf'
@@ -148,11 +148,22 @@ workflow {
         ch_versions = ch_versions.mix(SAMTOOLS_INDEX.out.versions)
     }
 
+    // Genome index (.fai): use <genome>.fai when present, otherwise build it
+    def fai_file = file("${params.genome}.fai")
+    if (fai_file.exists()) {
+        ch_fai = channel.value(fai_file)
+    } else {
+        ch_fai = SAMTOOLS_FAIDX(file(params.genome)).fai
+        ch_versions = ch_versions.mix(SAMTOOLS_FAIDX.out.versions)
+    }
+    GTF_INTRONS(file(params.gtf))
+
     SAMTOOLS_STATS(ch_bams_indexed)
-    EXTRACT_JUNCTIONS(ch_bams_indexed)
+    EXTRACT_JUNCTIONS(ch_bams_indexed, file(params.genome), ch_fai, GTF_INTRONS.out.introns)
     MAKE_BIGWIG(ch_bams_indexed)
     ch_junctions = EXTRACT_JUNCTIONS.out.junctions
-    ch_versions = ch_versions.mix(SAMTOOLS_STATS.out.versions, EXTRACT_JUNCTIONS.out.versions, MAKE_BIGWIG.out.versions)
+    ch_versions = ch_versions.mix(SAMTOOLS_STATS.out.versions, EXTRACT_JUNCTIONS.out.versions, MAKE_BIGWIG.out.versions,
+                                  GTF_INTRONS.out.versions)
 
     // 3. COHORT COLLECTION
     ch_bams_for_cohort = ch_bams_indexed.map { _meta, bam, _bai -> bam }.collect()

@@ -3,7 +3,7 @@
  *
  * FASTQ input: MINIMAP2_INDEX (once) + JUNC_BED (once) -> MINIMAP2_ALIGN (per sample)
  * BAM input:   SAMTOOLS_INDEX (per sample; stages the BAM as <sample>.sorted.bam)
- * Both:        SAMTOOLS_STATS, EXTRACT_JUNCTIONS, MAKE_BIGWIG
+ * Both:        SAMTOOLS_STATS, EXTRACT_JUNCTIONS (with SAMTOOLS_FAIDX, GTF_INTRONS), MAKE_BIGWIG
  *
  * All awk code is POSIX (no gawk extensions) and runs with BusyBox awk.
  */
@@ -203,30 +203,19 @@ process SAMTOOLS_STATS {
     """
 }
 
-process EXTRACT_JUNCTIONS {
-    tag "${meta.id}"
-    publishDir "${params.outdir}/junctions", mode: params.publish_dir_mode, pattern: "*.junctions.bed"
+process SAMTOOLS_FAIDX {
+    tag "${fasta.name}"
 
     input:
-    tuple val(meta), path(bam), path(bai)
+    path fasta
 
     output:
-    tuple val(meta), path("${meta.id}.junctions.bed"), emit: junctions
-    path "versions.yml", emit: versions
+    path "${fasta.name}.fai", emit: fai
+    path "versions.yml"     , emit: versions
 
     script:
     """
-    set -o pipefail
-    # Junctions from the CIGAR strings (bin/extract_junctions.awk)
-    samtools view -F 4 ${bam} \\
-        | awk -f "\$(command -v extract_junctions.awk)" \\
-        | sort -k1,1 -k2,2n -k3,3n | uniq > ${meta.id}.junctions.bed
-
-    if [ ! -s ${meta.id}.junctions.bed ]; then
-        echo "Warning: no junctions extracted from ${bam}" >&2
-    else
-        echo "Extracted \$(wc -l < ${meta.id}.junctions.bed) junctions"
-    fi
+    samtools faidx ${fasta}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -236,7 +225,79 @@ process EXTRACT_JUNCTIONS {
 
     stub:
     """
-    touch ${meta.id}.junctions.bed
+    touch ${fasta.name}.fai
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
+    END_VERSIONS
+    """
+}
+
+process GTF_INTRONS {
+    tag "${gtf.name}"
+
+    input:
+    path gtf
+
+    output:
+    path "gtf_introns.tsv", emit: introns
+    path "versions.yml"   , emit: versions
+
+    script:
+    // Exons reduced to transcript_id, chr, start, end, strand; introns between consecutive exons
+    """
+    awk -F '\\t' -v OFS='\\t' '\$3 == "exon" { match(\$9, /transcript_id "[^"]+"/); print substr(\$9, RSTART + 15, RLENGTH - 16), \$1, \$4, \$5, \$7 }' ${gtf} \\
+        | sort -k1,1 -k3,3n \\
+        | awk -f "\$(command -v gtf_introns.awk)" \\
+        | sort -u > gtf_introns.tsv
+    echo "Annotated introns: \$(wc -l < gtf_introns.tsv)"
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        samtools: \$(samtools --version | head -n 1 | sed 's/^samtools //')
+    END_VERSIONS
+    """
+
+    stub:
+    """
+    touch gtf_introns.tsv
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
+    END_VERSIONS
+    """
+}
+
+process EXTRACT_JUNCTIONS {
+    tag "${meta.id}"
+    publishDir "${params.outdir}/junctions", mode: params.publish_dir_mode, pattern: "*.junctions.{bed,tsv}"
+
+    input:
+    tuple val(meta), path(bam), path(bai)
+    path fasta
+    path fai
+    path introns       // annotated introns (GTF_INTRONS)
+
+    output:
+    tuple val(meta), path("${meta.id}.junctions.bed"), emit: junctions
+    tuple val(meta), path("${meta.id}.junctions.tsv"), emit: tsv
+    path "versions.yml", emit: versions
+
+    script:
+    // Primary, mapped reads with MAPQ >= --junction_min_mapq; strand from ts:A (minimap2), else XS:A,
+    // else '.' (bin/extract_junctions.sh, bin/extract_junctions.awk)
+    """
+    extract_junctions.sh ${bam} ${fasta} ${introns} ${params.junction_min_mapq} ${meta.id}
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        samtools: \$(samtools --version | head -n 1 | sed 's/^samtools //')
+    END_VERSIONS
+    """
+
+    stub:
+    """
+    touch ${meta.id}.junctions.bed ${meta.id}.junctions.tsv
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         stub: "stub"

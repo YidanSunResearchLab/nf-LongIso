@@ -128,6 +128,15 @@
                     "default": "",
                     "description": "Extra options for building the minimap2 index (e.g. -k, -w, -H). Ignored when --minimap2_index is given.",
                     "fa_icon": "fas fa-terminal"
+                },
+                "junction_min_mapq": {
+                    "type": "integer",
+                    "default": 0,
+                    "minimum": 0,
+                    "maximum": 255,
+                    "fa_icon": "fas fa-filter",
+                    "description": "Minimum MAPQ of the primary alignments used to extract splice junctions (default 0: all).",
+                    "help_text": "Applies to both input types. Junction strand comes from the minimap2 ts:A tag (or XS:A for other aligners); junctions without either tag get strand '.'."
                 }
             }
         },

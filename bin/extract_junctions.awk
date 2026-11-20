@@ -1,17 +1,25 @@
-# NextLongIso: splice junctions from SAM records (samtools view -F 4 output), as BED6 lines
-# (chr, intron start0, intron end, name, 1000, strand).
-# Strand: XS:A tag if present, otherwise the read strand (FLAG bit 16).
-# Bit tests use int(flag / 2^k) % 2 instead of gawk's and().  POSIX awk.
+# NextLongIso: count splice junctions in SAM records (samtools view output of primary, mapped reads).
+# Output (unsorted, one line per junction and strand): chr, intron start0, intron end, strand, reads
+#
+# Transcript strand of a read:
+#   ts:A tag (minimap2): '+' = transcript on the read's alignment strand, '-' = opposite strand
+#   otherwise XS:A (other aligners), otherwise '.' (unknown); the read orientation alone is not used.
+# Bit tests use int(flag / 2^k) % 2 (POSIX awk, no gawk and()).
 BEGIN { OFS = "\t" }
 {
-    chr = $3; pos = $4; flag = $2; cigar = $6
-    strand = "."
+    flag = $2; cigar = $6
+    ts = ""; xs = ""
     for (i = 12; i <= NF; i++) {
-        if ($i ~ /^XS:A:/) { strand = substr($i, 6, 1); break }
+        if ($i ~ /^ts:A:/) ts = substr($i, 6, 1)
+        else if ($i ~ /^XS:A:/) xs = substr($i, 6, 1)
     }
-    if (strand == ".") strand = (int(flag / 16) % 2 == 1) ? "-" : "+"
+    read_strand = (int(flag / 16) % 2 == 1) ? "-" : "+"
+    if (ts == "+") strand = read_strand
+    else if (ts == "-") strand = (read_strand == "+") ? "-" : "+"
+    else if (xs == "+" || xs == "-") strand = xs
+    else strand = "."
 
-    ref_pos = pos
+    ref_pos = $4
     while (match(cigar, /[0-9]+[MIDNSHPX=]/)) {
         len = substr(cigar, RSTART, RLENGTH - 1) + 0
         op  = substr(cigar, RSTART + RLENGTH - 1, 1)
@@ -19,10 +27,9 @@ BEGIN { OFS = "\t" }
         if (op == "M" || op == "=" || op == "X" || op == "D") {
             ref_pos += len
         } else if (op == "N") {
-            junc_start = ref_pos - 1
-            junc_end = ref_pos + len - 1
-            print chr, junc_start, junc_end, "junc_" chr "_" junc_start "_" junc_end "_" strand, "1000", strand
+            n[$3 OFS (ref_pos - 1) OFS (ref_pos + len - 1) OFS strand]++
             ref_pos += len
         }
     }
 }
+END { for (k in n) print k, n[k] }

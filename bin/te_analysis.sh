@@ -50,7 +50,12 @@ fi
 # unlike counting FNR == 1, this stays correct when an input file is empty.
 
 # GTF attribute lookup by name (no greedy sed): attr($9, "gene_id")
+# Junction end lookup: a junction supports a transcript when it is on the transcript strand or its
+# strand is unknown ('.'): has_end(je, chr, "S"|"E", position, transcript_strand)
 AWK_ATTR='
+function has_end(je, chr, type, pos, strand) {
+    return ((chr SUBSEP type SUBSEP pos SUBSEP strand) in je) || ((chr SUBSEP type SUBSEP pos SUBSEP ".") in je)
+}
 function attr(s, key,    p) {
     if (match(s, "(^|[; ])" key " \"[^\"]*\"")) {
         p = substr(s, RSTART, RLENGTH)
@@ -99,7 +104,9 @@ fi
 
 # Observed junction endpoints (intron start0 = exon end; intron end = next exon start0)
 if [ $# -gt 0 ]; then
-    cat "$@" | awk -F '\t' -v OFS='\t' 'NF >= 3 { print $1, "S", $2; print $1, "E", $3 }' | sort -u > junction_ends.txt
+    # chr, S|E, position, strand ('.' when the BED has no strand column or the strand is unknown)
+    cat "$@" | awk -F '\t' -v OFS='\t' 'NF >= 3 { st = (NF >= 6 && ($6 == "+" || $6 == "-")) ? $6 : "."; print $1, "S", $2, st; print $1, "E", $3, st }' \
+        | sort -u > junction_ends.txt
 else
     : > junction_ends.txt
 fi
@@ -125,14 +132,14 @@ bedtools intersect -s -f 0.9 -wa -wb -a iso_pure_intronic_exons.bed -b te.bed > 
 # combination is reported. Same test in both counting modes.
 {
     printf 'transcript_id\tgene_id\texon_chr\texon_start\texon_end\tTE_id\tTE_chr\tTE_start\tTE_end\t%s\n' "$SAMPLES"
-    awk -F '\t' -v OFS='\t' '
-        fileno == 1 { je[$1 SUBSEP $2 SUBSEP $3] = 1; next }
+    awk -F '\t' -v OFS='\t' "$AWK_ATTR"'
+        fileno == 1 { je[$1 SUBSEP $2 SUBSEP $3 SUBSEP $4] = 1; next }
         fileno == 2 {
             # exon: $1-$6, TE: $7-$12. Left boundary needs a junction END, right boundary a junction START.
             okl = 0; okr = 0
             for (d = -5; d <= 5; d++) {
-                if (($1 SUBSEP "E" SUBSEP ($2 + d)) in je) okl = 1
-                if (($1 SUBSEP "S" SUBSEP ($3 + d)) in je) okr = 1
+                if (has_end(je, $1, "E", $2 + d, $6)) okl = 1
+                if (has_end(je, $1, "S", $3 + d, $6)) okr = 1
             }
             if (okl && okr) { key = $4 SUBSEP $1 SUBSEP $2 SUBSEP $3 SUBSEP $10 SUBSEP $7 SUBSEP $8 SUBSEP $9; hit[key] = 1; tx[$4] = 1 }
             next
@@ -159,8 +166,8 @@ bedtools intersect $STRAND_OPT -wo -a exons_ranked.bed -b te_full.bed > exon_te_
 
 {
     printf 'transcript_id\tgene_id\tTE_id\tsubfamily\tfamily\tclass\tTE_chr\tTE_start\tTE_end\tTE_strand\toverlap_bp\tTE_fraction_of_transcript\tstrand_relation\tcategory\texon_positions\tjunction_supported\n'
-    awk -F '\t' -v OFS='\t' -v minov="$MIN_OV" -v afrac="$AUTO_FRAC" '
-        fileno == 1 { je[$1 SUBSEP $2 SUBSEP $3] = 1; next }
+    awk -F '\t' -v OFS='\t' -v minov="$MIN_OV" -v afrac="$AUTO_FRAC" "$AWK_ATTR"'
+        fileno == 1 { je[$1 SUBSEP $2 SUBSEP $3 SUBSEP $4] = 1; next }
         fileno == 2 { txlen[$1] = $2; next }
         fileno == 3 { if (FNR > 1) gene[$1] = $2; next }
         fileno == 4 {
@@ -183,8 +190,8 @@ bedtools intersect $STRAND_OPT -wo -a exons_ranked.bed -b te_full.bed > exon_te_
             # Splice sites of this exon: left boundary unless genomically first, right unless last
             if ($8 > 1) {
                 ok = 1
-                if ($9 > 1) { f = 0; for (d = -5; d <= 5; d++) if (($1 SUBSEP "E" SUBSEP ($2 + d)) in je) f = 1; if (!f) ok = 0 }
-                if ($9 < $8) { f = 0; for (d = -5; d <= 5; d++) if (($1 SUBSEP "S" SUBSEP ($3 + d)) in je) f = 1; if (!f) ok = 0 }
+                if ($9 > 1) { f = 0; for (d = -5; d <= 5; d++) if (has_end(je, $1, "E", $2 + d, $6)) f = 1; if (!f) ok = 0 }
+                if ($9 < $8) { f = 0; for (d = -5; d <= 5; d++) if (has_end(je, $1, "S", $3 + d, $6)) f = 1; if (!f) ok = 0 }
                 if (sup[k] == "NA") sup[k] = ok ? "yes" : "no"
                 else if (!ok) sup[k] = "no"
             }
