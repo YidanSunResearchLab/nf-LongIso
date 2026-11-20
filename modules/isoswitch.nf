@@ -42,4 +42,13 @@ process ISOSWITCH {
         bioconductor-isoformswitchanalyzer: \$(Rscript -e 'cat(as.character(packageVersion("IsoformSwitchAnalyzeR")))')
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch isoform_switch_results.csv significant_switches.csv
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
+    END_VERSIONS
+    """
 }

@@ -22,6 +22,15 @@ process BAMBU_PREP {
         bioconductor-bambu: \$(Rscript -e 'cat(as.character(packageVersion("bambu")))')
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch bambu_annotations.rds
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
+    END_VERSIONS
+    """
 }
 
 process BAMBU {
@@ -127,6 +136,15 @@ process BAMBU {
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         bioconductor-bambu: \$(Rscript -e 'cat(as.character(packageVersion("bambu")))')
+    END_VERSIONS
+    """
+
+    stub:
+    """
+    touch bambu_results.rds extended_annotations.gtf counts_transcript.txt counts_gene.txt CPM_transcript.txt
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
     END_VERSIONS
     """
 }

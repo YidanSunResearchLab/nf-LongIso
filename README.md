@@ -14,7 +14,7 @@ Figure 1. Overview of the NextLongIso pipeline, showing read alignment, isoform 
 
 * **End-to-end automation** of long-read RNA-seq analysis from FASTQ to results.
 * **Supports multiple platforms:** Fully compatible with both **PacBio** and **Nanopore** long-read data.
-* **Integrated analysis tools:** Utilizes minimap2, samtools, deeptools, Bambu, DESeq2, IsoformSwitchAnalyzer, SUPPA2, ProActiv, bedtools and custom scripts.
+* **Integrated analysis tools:** Utilizes minimap2, samtools, deeptools, Bambu, DESeq2, IsoformSwitchAnalyzeR, SUPPA2, ProActiv, bedtools and custom scripts.
 * **Containerized environment:** Uses Singularity/Apptainer with pre-built images from Docker Hub.
 * **Fully modular, reproducible, and scalable**—features overridable reference paths, making it ideal for large datasets and HPC environments.
 
@@ -139,7 +139,7 @@ While we aim to maintain long-term support for NextLongIso, development prioriti
 If you use NextLongIso in your work, please cite:
 
 Tan J. et al. (2026). **NextLongIso: a comprehensive Nextflow pipeline for multi-dimensional long-read RNA-seq analysis.** Bioinformatics. https://academic.oup.com/bioinformatics/advance-article/doi/10.1093/bioinformatics/btag518/8750111.
-* **The individual tools used within the pipeline:** minimap2, samtools, deeptools, Bambu, SUPPA2, IsoformSwitchAnalyzer, ProActiv, DESeq2, bedtools, etc.
+* **The individual tools used within the pipeline:** minimap2, samtools, deeptools, Bambu, SUPPA2, IsoformSwitchAnalyzeR, ProActiv, DESeq2, bedtools, etc.
 
 ⚖️ **License**
 

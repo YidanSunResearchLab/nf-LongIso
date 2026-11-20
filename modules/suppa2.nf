@@ -56,4 +56,14 @@ process SUPPA2 {
         suppa: \$(python3 -c "import importlib.metadata as m; print(m.version('suppa'))" 2>/dev/null || echo 2.4)
     END_VERSIONS
     """
+
+    stub:
+    """
+    mkdir -p psi
+    touch events_SE_strict.ioe psi/events_SE_samples.psi psi/events_SE_samples_filtered.psi
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
+    END_VERSIONS
+    """
 }

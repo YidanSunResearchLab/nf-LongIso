@@ -42,4 +42,13 @@ process TE_ANALYSIS {
         bedtools: \$(bedtools --version | sed 's/^bedtools v//')
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch TE_family_counts.tsv TE_instance_counts.tsv isoform_TE_exonization.tsv isoform_TE_annotation.tsv
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
+    END_VERSIONS
+    """
 }

@@ -34,6 +34,15 @@ process DESEQ2 {
         bioconductor-deseq2: \$(Rscript -e 'cat(as.character(packageVersion("DESeq2")))')
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch DE_results.csv normalized_counts.csv pca_plot.pdf deseq2_${level}_mqc.tsv
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
+    END_VERSIONS
+    """
 }
 
 process TE_DESEQ2 {
@@ -67,6 +76,15 @@ process TE_DESEQ2 {
     "${task.process}":
         r-base: \$(Rscript -e 'cat(as.character(getRversion()))')
         bioconductor-deseq2: \$(Rscript -e 'cat(as.character(packageVersion("DESeq2")))')
+    END_VERSIONS
+    """
+
+    stub:
+    """
+    touch DE_TE_${type}_results.csv norm_counts_${type}.csv volcano_${type}.pdf pca_${type}.pdf
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
     END_VERSIONS
     """
 }

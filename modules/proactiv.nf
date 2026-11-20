@@ -44,4 +44,13 @@ process PROACTIV {
         bioconductor-proactiv: \$(Rscript -e 'cat(as.character(packageVersion("proActiv")))')
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch promoter_activity.tsv promoter_counts.tsv
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
+    END_VERSIONS
+    """
 }

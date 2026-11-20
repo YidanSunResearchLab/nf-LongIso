@@ -28,6 +28,15 @@ process MINIMAP2_INDEX {
         minimap2: \$(minimap2 --version)
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch genome.mmi
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
+    END_VERSIONS
+    """
 }
 
 process JUNC_BED {
@@ -47,6 +56,15 @@ process JUNC_BED {
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         minimap2: \$(minimap2 --version)
+    END_VERSIONS
+    """
+
+    stub:
+    """
+    touch junctions_guide.bed
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
     END_VERSIONS
     """
 }
@@ -98,6 +116,15 @@ process MINIMAP2_ALIGN {
         samtools: \$(samtools --version | head -n 1 | sed 's/^samtools //')
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch ${meta.id}.sorted.bam ${meta.id}.sorted.bam.bai
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
+    END_VERSIONS
+    """
 }
 
 process SAMTOOLS_INDEX {
@@ -132,6 +159,15 @@ process SAMTOOLS_INDEX {
         samtools: \$(samtools --version | head -n 1 | sed 's/^samtools //')
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch ${meta.id}.sorted.bam ${meta.id}.sorted.bam.bai
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
+    END_VERSIONS
+    """
 }
 
 process SAMTOOLS_STATS {
@@ -154,6 +190,15 @@ process SAMTOOLS_STATS {
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         samtools: \$(samtools --version | head -n 1 | sed 's/^samtools //')
+    END_VERSIONS
+    """
+
+    stub:
+    """
+    touch ${meta.id}.sorted.bam.stats ${meta.id}.sorted.bam.flagstat
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
     END_VERSIONS
     """
 }
@@ -211,6 +256,15 @@ process EXTRACT_JUNCTIONS {
         samtools: \$(samtools --version | head -n 1 | sed 's/^samtools //')
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch ${meta.id}.junctions.bed
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
+    END_VERSIONS
+    """
 }
 
 process MAKE_BIGWIG {
@@ -242,6 +296,15 @@ process MAKE_BIGWIG {
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         deeptools: \$(bamCoverage --version | sed 's/^bamCoverage //')
+    END_VERSIONS
+    """
+
+    stub:
+    """
+    touch ${meta.id}.bw
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub"
     END_VERSIONS
     """
 }
