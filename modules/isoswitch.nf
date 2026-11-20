@@ -36,21 +36,17 @@ process ISOSWITCH {
     colnames(counts_data)[1] <- "isoform_id"
     colnames(abund_data)[1]  <- "isoform_id"
 
-    clean_names <- function(x) {
-        x <- sub("\\\\..*", "", x) 
-        x <- make.names(x)
-        return(x)
-    }
+    # Sample names are validated by the samplesheet schema; strip only the exact BAM suffix
+    clean_names <- function(x) sub("[.]sorted([.]bam)?\$", "", x)
     colnames(counts_data) <- clean_names(colnames(counts_data))
     colnames(abund_data)  <- clean_names(colnames(abund_data))
 
     design_full <- read.csv("${samplesheet}", stringsAsFactors=FALSE)
-    design_full[,1] <- clean_names(design_full[,1])
-    common_samples <- intersect(design_full[,1], colnames(counts_data))
+    common_samples <- intersect(design_full\$sample, colnames(counts_data))
 
     minimal_design <- data.frame(
-        sampleID  = design_full[design_full[,1] %in% common_samples, 1],
-        condition = make.names(design_full[design_full[,1] %in% common_samples, 3])
+        sampleID  = design_full\$sample[design_full\$sample %in% common_samples],
+        condition = design_full\$condition[design_full\$sample %in% common_samples]
     )
     
     counts_data <- counts_data[, c("isoform_id", common_samples)]

@@ -1,0 +1,185 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/YidanSunResearchLab/nf-LongIso/main/nextflow_schema.json",
+    "title": "NextLongIso pipeline parameters",
+    "description": "Nextflow pipeline for multi-dimensional long-read RNA-seq analysis (isoforms, splicing, APA, promoters and transposable elements)",
+    "type": "object",
+    "$defs": {
+        "input_output_options": {
+            "title": "Input/output options",
+            "type": "object",
+            "fa_icon": "fas fa-terminal",
+            "description": "Samplesheet, reference files and output directory.",
+            "required": ["samplesheet", "genome", "gtf", "outdir"],
+            "properties": {
+                "samplesheet": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "schema": "assets/schema_input.json",
+                    "mimetype": "text/csv",
+                    "pattern": "^\\S+\\.csv$",
+                    "description": "Samplesheet CSV with columns sample,condition and fastq (or bam for --input_type bam).",
+                    "help_text": "Sample and condition names must match ^[A-Za-z][A-Za-z0-9_]*$ (letters, digits and underscores, starting with a letter). See the Samplesheet section of the README.",
+                    "fa_icon": "fas fa-file-csv"
+                },
+                "input_type": {
+                    "type": "string",
+                    "default": "fastq",
+                    "enum": ["fastq", "bam"],
+                    "description": "Input data type. 'fastq' aligns reads with minimap2; 'bam' starts from coordinate-sorted BAM files.",
+                    "fa_icon": "fas fa-file-import"
+                },
+                "genome": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "pattern": "^\\S+\\.(fa|fasta|fna)$",
+                    "description": "Genome FASTA (uncompressed). Required for both input types (used by minimap2 and Bambu).",
+                    "fa_icon": "fas fa-dna"
+                },
+                "gtf": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "pattern": "^\\S+\\.gtf$",
+                    "description": "Reference annotation GTF (uncompressed), from the same assembly and with the same chromosome names as --genome.",
+                    "fa_icon": "fas fa-book"
+                },
+                "te_gtf": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "pattern": "^\\S+\\.gtf$",
+                    "description": "Optional transposable-element GTF (TEtranscripts format). Enables the TE analysis.",
+                    "fa_icon": "fas fa-book"
+                },
+                "outdir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "default": "results",
+                    "description": "Output directory.",
+                    "fa_icon": "fas fa-folder-open"
+                },
+                "publish_dir_mode": {
+                    "type": "string",
+                    "default": "copy",
+                    "enum": ["symlink", "rellink", "link", "copy", "copyNoFollow", "move"],
+                    "description": "How result files are published to --outdir.",
+                    "fa_icon": "fas fa-copy",
+                    "hidden": true
+                }
+            }
+        },
+        "alignment_options": {
+            "title": "Alignment options (minimap2)",
+            "type": "object",
+            "fa_icon": "fas fa-align-center",
+            "description": "Options for FASTQ input. Ignored with --input_type bam.",
+            "properties": {
+                "minimap2_preset": {
+                    "type": "string",
+                    "default": "splice",
+                    "enum": ["splice", "splice:hq"],
+                    "description": "minimap2 preset (-x/-ax). Use 'splice:hq' for PacBio Iso-Seq or other high-accuracy reads.",
+                    "fa_icon": "fas fa-sliders-h"
+                },
+                "minimap2_args": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Extra minimap2 alignment options, appended after the defaults (e.g. --minimap2_args=\"-G 500k\").",
+                    "help_text": "Appended after -ax <preset> -t <cpus> [--junc-bed] --secondary=no, so later options override earlier ones. Index-building options (-k, -w, -H) have no effect here; use --minimap2_index_args.",
+                    "fa_icon": "fas fa-terminal"
+                },
+                "minimap2_junc_bed": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Guide spliced alignment with junctions from --gtf (--junc-bed).",
+                    "fa_icon": "fas fa-route"
+                },
+                "minimap2_index": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "pattern": "^\\S+\\.mmi$",
+                    "description": "Pre-built minimap2 index (.mmi). Skips index building. Must be built from --genome with the same preset.",
+                    "fa_icon": "fas fa-database"
+                },
+                "minimap2_index_args": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Extra options for building the minimap2 index (e.g. -k, -w, -H). Ignored when --minimap2_index is given.",
+                    "fa_icon": "fas fa-terminal"
+                }
+            }
+        },
+        "resource_options": {
+            "title": "Resource limits",
+            "type": "object",
+            "fa_icon": "fas fa-microchip",
+            "description": "Upper limits for any single task. Requests above these values are capped.",
+            "properties": {
+                "max_cpus": {
+                    "type": "integer",
+                    "default": 16,
+                    "minimum": 1,
+                    "description": "Maximum CPUs per task.",
+                    "fa_icon": "fas fa-microchip"
+                },
+                "max_memory": {
+                    "type": "string",
+                    "default": "128.GB",
+                    "pattern": "^\\d+(\\.\\d+)?\\.?\\s*(K|M|G|T)?B$",
+                    "description": "Maximum memory per task (e.g. '64.GB').",
+                    "fa_icon": "fas fa-memory"
+                },
+                "max_time": {
+                    "type": "string",
+                    "default": "72.h",
+                    "pattern": "^(\\d+\\.?\\s*(s|m|h|d|day)\\s*)+$",
+                    "description": "Maximum run time per task (e.g. '48.h').",
+                    "fa_icon": "far fa-clock"
+                }
+            }
+        },
+        "hpc_options": {
+            "title": "HPC options",
+            "type": "object",
+            "fa_icon": "fas fa-server",
+            "description": "Used by the slurm and lsf profiles (e.g. -profile singularity,lsf).",
+            "properties": {
+                "hpc_queue": {
+                    "type": "string",
+                    "description": "Queue/partition for submitted jobs.",
+                    "fa_icon": "fas fa-list"
+                },
+                "hpc_cluster_options": {
+                    "type": "string",
+                    "description": "Extra scheduler options, e.g. --hpc_cluster_options=\"-G compute-<group>\" for LSF at WashU RIS.",
+                    "fa_icon": "fas fa-terminal"
+                }
+            }
+        },
+        "generic_options": {
+            "title": "Generic options",
+            "type": "object",
+            "fa_icon": "fas fa-file-import",
+            "description": "Less common options.",
+            "properties": {
+                "trace_report_suffix": {
+                    "type": "string",
+                    "description": "Suffix for the execution report files in <outdir>/pipeline_info (default: launch timestamp).",
+                    "fa_icon": "far fa-calendar",
+                    "hidden": true
+                }
+            }
+        }
+    },
+    "allOf": [
+        { "$ref": "#/$defs/input_output_options" },
+        { "$ref": "#/$defs/alignment_options" },
+        { "$ref": "#/$defs/resource_options" },
+        { "$ref": "#/$defs/hpc_options" },
+        { "$ref": "#/$defs/generic_options" }
+    ]
+}

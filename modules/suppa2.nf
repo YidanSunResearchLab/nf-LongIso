@@ -17,19 +17,13 @@ process SUPPA2 {
 
     # 1. Clean expression file + strip version numbers from IDs
     python3 -c "
+import re
 import sys
 
 with open('${counts}', 'r') as f_in, open('cleaned_counts.txt', 'w') as f_out:
     header_line = next(f_in).rstrip('\\n').split('\\t')
     sample_names = header_line[2:]
-    sample_names = [
-        s.replace('.sorted', '')
-         .replace('.bam', '')
-         .replace('.bai', '')
-         .replace('.Aligned', '')
-         .strip()
-        for s in sample_names
-    ]
+    sample_names = [re.sub(r'[.]sorted([.]bam)?\$', '', s.strip()) for s in sample_names]
     
     if not sample_names:
         sys.exit('Error: No sample columns detected in header')

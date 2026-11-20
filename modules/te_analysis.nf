@@ -119,7 +119,7 @@ process TE_ANALYSIS {
     ############################################################
     # 5. JOINING AND SUMMARIES
     ############################################################
-    head -n 1 ${counts} | sed 's/\\.sorted//g; s/\\.bam//g' > counts_cleaned.tsv
+    head -n 1 ${counts} | awk 'BEGIN { FS = OFS = "\\t" } { for (i = 1; i <= NF; i++) sub(/[.]sorted([.]bam)?\$/, "", \$i); print }' > counts_cleaned.tsv
     tail -n +2 ${counts} >> counts_cleaned.tsv
 
     SAMPLES=\$(head -n 1 counts_cleaned.tsv | cut -f3-)

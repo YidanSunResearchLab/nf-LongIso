@@ -23,9 +23,8 @@ process DESEQ2 {
     counts_data <- read.table("${counts}", header=TRUE, row.names=1, check.names=FALSE)
     meta <- read.table("${samplesheet}", header=TRUE, sep=",", row.names=1)
 
-    colnames(counts_data) <- gsub("^X", "", colnames(counts_data))
-    colnames(counts_data) <- gsub(".sorted", "", colnames(counts_data))
-    colnames(counts_data) <- gsub(".bam", "", colnames(counts_data))
+    # Sample names are validated by the samplesheet schema; strip only the exact BAM suffix
+    colnames(counts_data) <- sub("[.]sorted([.]bam)?\$", "", colnames(counts_data))
     
     common_samples <- intersect(colnames(counts_data), rownames(meta))
     counts_data <- counts_data[, common_samples]
@@ -123,7 +122,7 @@ process TE_DESEQ2 {
     te_ids <- rownames(te_counts_mat)
     te_meta_cols\$ID_JOIN <- te_ids
 
-    clean_nm <- function(x) gsub(".bam|.sorted|^X", "", x)
+    clean_nm <- function(x) sub("[.]sorted([.]bam)?\$", "", x)
     colnames(te_counts_mat) <- clean_nm(colnames(te_counts_mat))
     colnames(gene_data)     <- clean_nm(colnames(gene_data))
 

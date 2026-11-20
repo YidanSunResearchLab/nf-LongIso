@@ -93,12 +93,8 @@ process PROACTIV {
 
     conditions <- sapply(sample_names, function(sname) {
         idx <- which(sample_ids == sname)
-        if (length(idx) == 0)
-            idx <- which(sapply(sample_ids, function(id) startsWith(sname, id)))
-        if (length(idx) == 0)
-            idx <- which(sapply(sample_ids, function(id) grepl(id, sname, fixed = TRUE)))
-        if (length(idx) == 0) { warning(sprintf("No condition for '%s'", sname)); return("unknown") }
-        sample_conditions[idx[1]]
+        if (length(idx) != 1) stop(sprintf("BAM '%s' does not match exactly one samplesheet sample", sname))
+        sample_conditions[idx]
     })
 
     message("Sample to condition mapping:")
