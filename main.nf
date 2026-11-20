@@ -60,6 +60,11 @@ def resolveReference(samples, requested) {
 
 workflow {
 
+    // --help / --helpFull: nf-schema has already printed the help text
+    if (params.help || params.helpFull) {
+        return
+    }
+
     validateParameters()
     log.info "NextLongIso v${workflow.manifest.version}"
     log.info paramsSummaryLog(workflow)

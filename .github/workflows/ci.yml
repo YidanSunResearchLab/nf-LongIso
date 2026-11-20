@@ -1,0 +1,102 @@
+name: CI
+
+# push / pull_request: schema checks, lint, TE unit test and a stub run of the test profile
+# workflow_dispatch:   a real run of the test profile (tiny dataset in tests/data)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  NXF_VER: "25.10.0"       # keep in sync with manifest.nextflowVersion and the README
+  NXF_ANSI_LOG: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Schema, lint, unit tests and stub run
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: nf-core/setup-nextflow@v2
+        with:
+          version: ${{ env.NXF_VER }}
+
+      - name: Check that the JSON schemas are valid (draft 2020-12)
+        run: |
+          python3 -m pip install --quiet jsonschema
+          python3 - <<'PY'
+          import json
+          from jsonschema import Draft202012Validator
+          for path in ["nextflow_schema.json", "assets/schema_input.json"]:
+              Draft202012Validator.check_schema(json.load(open(path)))
+              print(f"{path}: valid")
+          PY
+
+      - name: Parameter schema is usable by nf-schema (--help)
+        # nf-schema cancels the session after printing the help, so the exit status is 1 by design:
+        # check the printed help instead
+        run: |
+          nextflow run main.nf --help > help.txt 2>&1 || true
+          cat help.txt
+          grep -q "Input/output options" help.txt
+          ! grep -q "ERROR" help.txt
+
+      - name: Nextflow lint
+        run: nextflow lint main.nf modules nextflow.config conf
+
+      - name: TE analysis unit test (BusyBox awk in the bedtools container)
+        run: |
+          docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:$PWD" -w "$PWD" \
+            quay.io/biocontainers/bedtools:2.31.1--h13024bc_3 sh tests/te_unit/run_te_unit_test.sh
+
+      - name: Stub run (-profile test,docker -stub)
+        run: nextflow run main.nf -profile test,docker -stub --outdir results_stub
+
+  test:
+    name: Real run of the test profile
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      # GitHub-hosted runners have ~14 GB of free disk; the containers need several GB.
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          docker system prune --all --force
+          df -h /
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: nf-core/setup-nextflow@v2
+        with:
+          version: ${{ env.NXF_VER }}
+
+      - name: Run the test profile
+        run: nextflow run main.nf -profile test,docker --outdir results_test
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            results_test/pipeline_info/
+            results_test/multiqc/
+            .nextflow.log
