@@ -210,6 +210,19 @@
                     "fa_icon": "fas fa-filter",
                     "description": "Minimum |dIF| for significant isoform switches (IsoformSwitchAnalyzeR default 0.1)."
                 },
+                "isoswitch_consequences": {
+                    "type": "boolean",
+                    "default": true,
+                    "fa_icon": "fas fa-project-diagram",
+                    "description": "Predict ORFs (longest ORF on gffread transcript sequences) and analyse isoform switch consequences with IsoformSwitchAnalyzeR."
+                },
+                "isoswitch_n_plots": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 0,
+                    "fa_icon": "fas fa-chart-bar",
+                    "description": "Number of top switching genes drawn with switchPlot (switch_plots.pdf)."
+                },
                 "usage_alpha": {
                     "type": "number",
                     "default": 0.05,

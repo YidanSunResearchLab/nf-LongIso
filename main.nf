@@ -15,7 +15,7 @@ include { SUPPA2 }                                                             f
 include { TE_ANALYSIS }                                                        from './modules/te_analysis.nf'
 include { DESEQ2 as DESEQ2_GENE; DESEQ2 as DESEQ2_TRANSCRIPT;
           TE_DESEQ2 as TE_DESEQ2_FAMILY; TE_DESEQ2 as TE_DESEQ2_INSTANCE }   from './modules/deseq2.nf'
-include { ISOSWITCH }                                                          from './modules/isoswitch.nf'
+include { ISOSWITCH; GFFREAD }                                                 from './modules/isoswitch.nf'
 include { PROACTIV }                                                           from './modules/proactiv.nf'
 include { SOFTWARE_VERSIONS; MULTIQC }                                         from './modules/multiqc.nf'
 include { MAKE_DESIGN }                                                        from './modules/design.nf'
@@ -201,7 +201,15 @@ workflow {
     }
 
     // 6. ISOFORM SWITCHING, DE AND SPLICING
-    ISOSWITCH(ch_transcript_counts, ch_transcript_abundance, ch_extended_gtf, ch_design, reference)
+    // Transcript sequences for ORF prediction and switch consequences
+    if (params.isoswitch_consequences) {
+        GFFREAD(ch_extended_gtf, file(params.genome), ch_fai)
+        ch_nt_fasta = GFFREAD.out.fasta
+        ch_versions = ch_versions.mix(GFFREAD.out.versions)
+    } else {
+        ch_nt_fasta = channel.value([])
+    }
+    ISOSWITCH(ch_transcript_counts, ch_transcript_abundance, ch_extended_gtf, ch_design, reference, ch_nt_fasta)
     DESEQ2_GENE(BAMBU.out.gene_counts, ch_design, 'gene', reference)
     DESEQ2_TRANSCRIPT(ch_transcript_counts, ch_design, 'transcript', reference)
     SUPPA2(ch_extended_gtf, ch_transcript_counts)

@@ -6,7 +6,10 @@
 #   run_isoswitch.R --counts=counts_transcript.txt --abundance=CPM_transcript.txt \
 #               --gtf=extended_annotations.gtf --design=design.csv --design-formula="~ condition" \
 #               --reference=control \
-#               --alpha=0.05 --dif-cutoff=0.1
+#               --alpha=0.05 --dif-cutoff=0.1 [--nt-fasta=transcripts.fa --n-plots=10]
+#
+# With --nt-fasta (transcript sequences, e.g. from gffread), ORFs are predicted (analyzeORF, longest
+# ORF, no BSgenome needed) and switch consequences are analysed (types that need no external tools).
 #
 # Every non-reference condition is compared with the reference (condition_1 = reference,
 # condition_2 = other condition; dIF and dPAU are condition_2 - condition_1).
@@ -16,6 +19,9 @@
 #   significant_switches.csv          q < alpha and |dIF| > dif-cutoff (required)
 #   all_AS_events.csv, atss_results.csv, atts_results.csv
 #   switchlist.rds
+#   With --nt-fasta: switch_consequences.csv, consequence_summary.csv, consequence_enrichment.csv,
+#   consequence_summary.pdf, consequence_enrichment.pdf, switch_plots.pdf (top --n-plots switches);
+#   files contain a 'Message' column (PDFs a text page) when there is nothing to report.
 # With fewer than 2 conditions the two required files contain a single 'Message' column.
 
 .libPaths(unique(c(.libPaths(), "/usr/local/lib/R/site-library", "/usr/lib/R/library")))
@@ -101,6 +107,7 @@ switchList <- importRdata(
     designMatrix         = data.frame(sampleID = design$sample, condition = design$condition,
                                       design[, covariates, drop = FALSE], stringsAsFactors = FALSE),
     isoformExonAnnoation = opt$gtf,
+    isoformNtFasta       = opt[["nt-fasta"]],
     comparisonsToMake    = comparisons,
     showProgress         = FALSE,
     fixStringTieAnnotationProblem = TRUE
@@ -126,7 +133,82 @@ feat <- switchList$isoformFeatures
 clean_id <- function(x) trimws(gsub('"', '', sub(".*:", "", as.character(x))))
 feat$iso_clean <- clean_id(feat$isoform_id)
 
-# ---- 3. Switch tables --------------------------------------------------------------------------
+# ---- 3. Switch consequences (with transcript sequences) ------------------------------------------
+CONSEQUENCES <- c("intron_retention", "ORF_seq_similarity", "NMD_status", "tss", "tts",
+                  "last_exon", "isoform_length", "exon_number")
+message_pdf <- function(file, msg) { pdf(file, width = 8, height = 4); plot.new(); text(0.5, 0.5, msg, cex = 0.9); invisible(dev.off()) }
+if (!is.null(opt[["nt-fasta"]])) {
+    n_plots <- as.integer(if (is.null(opt[["n-plots"]])) 10 else opt[["n-plots"]])
+    switchList <- analyzeORF(switchList, orfMethod = "longest", showProgress = FALSE)
+    message("ORFs predicted: ", sum(!is.na(switchList$orfAnalysis$orfTransciptStart)))
+    # ORF amino-acid sequences (needed for ORF_seq_similarity); uses the transcript sequences already
+    # in the switch list, no genome object
+    switchList <- tryCatch(
+        extractSequence(switchList, onlySwitchingGenes = FALSE, alpha = alpha, dIFcutoff = dif_cutoff,
+                        extractNTseq = TRUE, extractAAseq = TRUE, addToSwitchAnalyzeRlist = TRUE,
+                        writeToFile = FALSE, quiet = TRUE),
+        error = function(e) { message("extractSequence: ", conditionMessage(e)); switchList })
+    switchList <- tryCatch(
+        analyzeSwitchConsequences(switchList, consequencesToAnalyze = CONSEQUENCES, alpha = alpha,
+                                  dIFcutoff = dif_cutoff, showProgress = FALSE),
+        error = function(e) { message("analyzeSwitchConsequences: ", conditionMessage(e)); switchList })
+    cons <- switchList$switchConsequence
+    if (!is.null(cons) && nrow(cons) > 0) {
+        write.csv(cons, "switch_consequences.csv", row.names = FALSE)
+        summ <- extractConsequenceSummary(switchList, consequencesToAnalyze = "all", alpha = alpha, dIFcutoff = dif_cutoff,
+                                          plot = FALSE, returnResult = TRUE)
+        write.csv(summ, "consequence_summary.csv", row.names = FALSE)
+        pdf("consequence_summary.pdf", width = 10, height = 6)
+        print(extractConsequenceSummary(switchList, consequencesToAnalyze = "all", alpha = alpha, dIFcutoff = dif_cutoff,
+                                        plot = TRUE, returnResult = FALSE))
+        invisible(dev.off())
+        enr <- tryCatch(extractConsequenceEnrichment(switchList, consequencesToAnalyze = "all", alpha = alpha,
+                                                     dIFcutoff = dif_cutoff, plot = FALSE, returnResult = TRUE,
+                                                     returnSummary = TRUE),
+                        error = function(e) data.frame(Message = conditionMessage(e)))
+        write.csv(enr, "consequence_enrichment.csv", row.names = FALSE)
+        pdf("consequence_enrichment.pdf", width = 10, height = 6)
+        tryCatch(print(extractConsequenceEnrichment(switchList, consequencesToAnalyze = "all", alpha = alpha,
+                                                    dIFcutoff = dif_cutoff, plot = TRUE, returnResult = FALSE)),
+                 error = function(e) { plot.new(); text(0.5, 0.5, conditionMessage(e)) })
+        invisible(dev.off())
+        message("Switch consequences: ", nrow(cons), " rows")
+    } else {
+        msg <- sprintf("No isoform switches with q < %g and |dIF| > %g: no switch consequences to report.", alpha, dif_cutoff)
+        message(msg)
+        for (f in c("switch_consequences.csv", "consequence_summary.csv", "consequence_enrichment.csv")) {
+            write.csv(data.frame(Message = msg), f, row.names = FALSE)
+        }
+        message_pdf("consequence_summary.pdf", msg); message_pdf("consequence_enrichment.pdf", msg)
+    }
+
+    # switchPlot for the top switching genes (smallest isoform switch q-value)
+    f2 <- switchList$isoformFeatures
+    top <- f2[which(f2$isoform_switch_q_value < alpha & abs(f2$dIF) > dif_cutoff), ]
+    top <- top[order(top$isoform_switch_q_value, -abs(top$dIF)), ]
+    top <- top[!duplicated(paste(top$gene_id, top$condition_1, top$condition_2)), ]
+    top <- head(top, n_plots)
+    pdf("switch_plots.pdf", width = 12, height = 7)
+    if (nrow(top) == 0) {
+        plot.new(); text(0.5, 0.5, sprintf("No isoform switches with q < %g and |dIF| > %g", alpha, dif_cutoff))
+    } else {
+        # switchPlot measures text before its own grid.newpage(), which leaves a blank first page on a
+        # fresh device; capture each plot off-screen and draw it on its own page instead.
+        for (i in seq_len(nrow(top))) {
+            tryCatch({
+                g <- grid::grid.grabExpr(switchPlot(switchList, gene = top$gene_id[i], condition1 = top$condition_1[i],
+                                                    condition2 = top$condition_2[i], alphas = c(alpha, alpha / 50),
+                                                    dIFcutoff = dif_cutoff, plotTopology = FALSE),
+                                         wrap.grobs = TRUE, width = 12, height = 7)
+                grid::grid.newpage(); grid::grid.draw(g)
+            }, error = function(e) { plot.new(); text(0.5, 0.5, paste(top$gene_id[i], conditionMessage(e))) })
+        }
+    }
+    invisible(dev.off())
+    message("switch_plots.pdf: ", nrow(top), " gene(s)")
+}
+
+# ---- 4. Switch tables --------------------------------------------------------------------------
 saveRDS(switchList, "switchlist.rds")
 write.csv(feat, "isoform_switch_results.csv", row.names = FALSE)
 sig_switch <- feat[which(feat$isoform_switch_q_value < alpha & abs(feat$dIF) > dif_cutoff), ]
