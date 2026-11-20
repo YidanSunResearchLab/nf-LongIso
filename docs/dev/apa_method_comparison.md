@@ -30,15 +30,18 @@ batch covariate.
 
 ## Demo comparison
 
-The figures below come from `demo_v0.2.0_r2`, run before two later changes: the rescue by a poly(A)
-signal now requires AATAAA or ATTAAA 10-35 nt upstream (any of 12 hexamers 10-40 nt before), and novel
-transcripts are recognised by the transcript IDs of `--gtf` instead of the `BambuTx` prefix (same result
-on the demo). The internal-priming figures will be updated after the next demo run.
+New method: `demo_v0.2.0_r3/apa/` (current rules: rescue only by AATAAA/ATTAAA 10-35 nt upstream or an
+annotated end within 50 bp; novel = transcript ID not in `--gtf`). The PAS clusters, counts and DEXSeq
+results are identical to those of `demo_v0.2.0_r2` (previous rescue rule: any of 12 hexamers 10-40 nt
+upstream).
 
-| | Old (`demo_v0.2.0/isoswitch/`) | New (`demo_v0.2.0_r2/apa/`) |
+| | Old (`demo_v0.2.0/isoswitch/`) | New (`demo_v0.2.0_r3/apa/`) |
 |---|---|---|
 | Transcript 3' ends | from switch-analysis isoforms only | 388,075 (131 novel) |
-| Ends flagged as internal priming | - | 0 (1 A-rich novel end, rescued by a PAS signal / nearby annotated end) |
+| Novel ends with an A-rich downstream sequence | - | 1 (BambuTx75, chr2:152,672,567, minus strand; 75 % A downstream; only the weak hexamer AAAAAG upstream) |
+| Ends flagged as internal priming (removed) | - | 0 |
+| Ends rescued | - | 1: BambuTx75, by an annotated 3' end within 50 bp (with the previous rule it also qualified through AAAAAG) |
+| Novel ends with AATAAA/ATTAAA 10-35 nt upstream | - | 101 of 131 (any of the 12 hexamers 10-40 nt upstream: 117) |
 | PAS clusters | 1,564 in 874 genes (expressed isoforms of tested genes) | 234,252 in 78,936 genes |
 | Tested | 1,564 clusters | 75 PAS in 37 genes (≥ 10 reads, ≥ 2 PAS per gene) |
 | Significant | 1,041 clusters (q < 0.05) in 450 genes | 6 PAS (padj < 0.05); **3 genes** (gene q < 0.05) |

@@ -136,7 +136,8 @@ were found during the work on v0.2.0.
   when set (recommended on HPC; see README), otherwise to `<work directory>/singularity`.
 - IsoformSwitchAnalyzeR imports the data with `detectUnwantedEffects = FALSE`, so the switch test uses the
   `--design` formula as given (by default it adds surrogate variables, which made its model differ from
-  DESeq2 and the usage tests).
+  DESeq2 and the usage tests; on the demo it added one and batch-corrected the values used by
+  `preFilter`, which kept 2,270 instead of 1,997 isoforms).
 - Under `-profile docker`, `SQANTI3_QC` disables the image's `conda run` entrypoint
   (`--entrypoint ""`); the process activates the environment itself.
 - Alignment is a single pipe `zcat | awk | minimap2 | samtools sort` (no SAM or truncated FASTQ on disk)
@@ -208,9 +209,9 @@ were found during the work on v0.2.0.
   proActiv had STAR strand code 0, which proActiv (`readSTARJunctions`) reads as `+`, so promoters of
   minus-strand genes had no counts (demo: 79,200 promoters). proActiv now reads the stranded junction
   tables (`+` = 1, `-` = 2; junctions of unknown strand are not used) with their real motif and annotation
-  codes. On the test data, minus-strand promoters with counts go from 0 to 172 (active: 0 to 33/55 in the
-  two conditions); plus-strand counts lose a few reads that came from antisense junctions and
-  supplementary alignments.
+  codes. On the demo data, minus-strand promoters with counts go from 0 to 4,381 (active: 0 to 858 /
+  1,143 in the two conditions; plus strand 4,491, active 880 / 1,202); plus-strand counts only lose reads
+  that came from antisense junctions, supplementary alignments and junctions of unknown strand.
 - **Promoter quantification** (A4): proActiv infers promoter activity from first-intron junctions, so
   promoters of single-exon transcripts are not quantified (25,638 promoters in the demo annotation); the
   optional `tss` method covers them (see Added).

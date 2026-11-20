@@ -39,17 +39,25 @@ proActiv for counting; they now carry the real codes.
 
 ### Effect
 
-| Data set | Run | Minus-strand promoters | with counts | Active (control / treatment) | Plus-strand promoters with counts | Alternative promoters |
-|---|---|---|---|---|---|---|
-| test data | before (`tiny_p7_proactiv`) | 505 | 0 | 0 / 0 | 188 | 0 |
-| test data | after (`tiny_r3_default`) | 505 | 172 | 33 / 55 | 188 | 0 |
-| demo | v0.1.0 baseline and `demo_v0.2.0` | 79,200 | 0 | 0 / 0 | 4,539 (active 890 / 1,208) | 0 |
-| demo | after the fix | to be measured (demo re-run pending) | | | | |
+| Data set | Run | Strand | Promoters | with counts | Active (Major + Minor), control / treatment | Major, control / treatment | Alternative promoters |
+|---|---|---|---|---|---|---|---|
+| test data | before (`tiny_p7_proactiv`) | + | 517 | 188 | 46 / 58 | 34 / 30 | 0 |
+| | | - | 505 | 0 | 0 / 0 | 0 / 0 | 0 |
+| test data | after (`tiny_r3_default`) | + | 517 | 188 | 46 / 58 | 34 / 30 | 0 |
+| | | - | 505 | 172 | 33 / 55 | 8 / 15 | 0 |
+| demo | before (v0.1.0 baseline and `demo_v0.2.0`) | + | 81,297 | 4,539 | 890 / 1,208 | 690 / 875 | 0 |
+| | | - | 79,200 | 0 | 0 / 0 | 0 / 0 | 0 |
+| demo | after (`demo_v0.2.0_r3`) | + | 81,297 | 4,491 | 880 / 1,202 | 685 / 869 | 0 |
+| | | - | 79,200 | 4,381 | 858 / 1,143 | 334 / 373 | 0 |
 
-On the test data, 34 of the 517 plus-strand promoters lose some reads (52 of 1,800 reads in those
-promoters, no promoter gains reads): reads of minus-strand junctions with the same coordinates as a
-plus-strand intron, of supplementary alignments, and of junctions of unknown strand are no longer
-counted for them. The BAM-input run gives byte-identical proActiv counts.
+With the fix, minus-strand promoters are quantified as often as plus-strand ones (4,381 vs 4,491 with
+counts on the demo). Plus-strand counts only decrease: on the test data 34 of the 517 plus-strand
+promoters lose some reads (52 of 1,800 reads in those promoters), on the demo 647 promoters lose reads
+(19,121 to 18,101 reads; 48 promoters lose all their counts), and no promoter gains reads. These reads
+came from minus-strand junctions with the same coordinates as a plus-strand intron, from supplementary
+alignments and from junctions of unknown strand, which are no longer counted for them. The BAM-input
+run on the test data gives byte-identical proActiv counts. No alternative promoters are found before or
+after the fix with the default `getAlternativePromoters()` thresholds (2 × 10,000 reads per condition).
 
 ## tss method on the demo (`demo_v0.2.0_r2`, before the changes of this round)
 
