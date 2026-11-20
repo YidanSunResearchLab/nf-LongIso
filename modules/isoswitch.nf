@@ -1,6 +1,6 @@
 process ISOSWITCH {
     tag "isoform_switch"
-    publishDir "${params.outdir}/isoswitch", mode: 'copy'
+    publishDir "${params.outdir}/isoswitch", mode: params.publish_dir_mode
 
     input:
     path counts

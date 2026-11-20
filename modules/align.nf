@@ -85,7 +85,7 @@ process MINIMAP2 {
 
 process SAMTOOLS_SORT {
     tag "${meta.id}"
-    publishDir "${params.outdir}/minimap2", mode: 'copy'
+    publishDir "${params.outdir}/minimap2", mode: params.publish_dir_mode
     input:
     tuple val(meta), path(sam)
     output:
@@ -114,7 +114,7 @@ process SAMTOOLS_SORT {
 
 process EXTRACT_JUNCTIONS {
     tag "${meta.id}"
-    publishDir "${params.outdir}/junctions", mode: 'copy'
+    publishDir "${params.outdir}/junctions", mode: params.publish_dir_mode
     input:
     tuple val(meta), path(bam), path(bai)
     path gtf
@@ -176,7 +176,7 @@ process EXTRACT_JUNCTIONS {
 
 process MAKE_BIGWIG {
     tag "${meta.id}"
-    publishDir "${params.outdir}/bigwig", mode: 'copy'
+    publishDir "${params.outdir}/bigwig", mode: params.publish_dir_mode
     input:
     tuple val(meta), path(bam), path(bai)
     output:

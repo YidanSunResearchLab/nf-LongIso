@@ -1,6 +1,6 @@
 process MULTIQC {
     label 'process_medium'
-    publishDir "${params.outdir}/multiqc", mode: 'copy'
+    publishDir "${params.outdir}/multiqc", mode: params.publish_dir_mode
 
     input:
     path 'inputs/*' 

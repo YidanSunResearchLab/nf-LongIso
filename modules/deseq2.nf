@@ -1,6 +1,6 @@
 process DESEQ2 {
     tag "deseq2"
-    publishDir "${params.outdir}/DE_genes", mode: 'copy'
+    publishDir "${params.outdir}/DE_genes", mode: params.publish_dir_mode
 
     input:
     path counts
@@ -85,7 +85,7 @@ R_SCRIPT
 
 process TE_DESEQ2 {
     tag "DE_TE_${type}"
-    publishDir "${params.outdir}/TE/DE", mode: 'copy'
+    publishDir "${params.outdir}/TE/DE", mode: params.publish_dir_mode
 
     input:
     path te_counts

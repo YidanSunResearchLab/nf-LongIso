@@ -1,6 +1,6 @@
 process PROACTIV {
     tag "proactiv"
-    publishDir "${params.outdir}/proactiv", mode: 'copy'
+    publishDir "${params.outdir}/proactiv", mode: params.publish_dir_mode
 
     input:
     path gtf

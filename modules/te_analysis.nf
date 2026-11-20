@@ -1,6 +1,6 @@
 process TE_ANALYSIS {
     tag "TE_analysis"
-    publishDir "${params.outdir}/TE", mode: 'copy'
+    publishDir "${params.outdir}/TE", mode: params.publish_dir_mode
     
     input:
     path iso_gtf

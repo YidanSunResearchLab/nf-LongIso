@@ -1,6 +1,6 @@
 process SUPPA2 {
     tag "suppa2_quant"
-    publishDir "${params.outdir}/suppa2", mode: 'copy'
+    publishDir "${params.outdir}/suppa2", mode: params.publish_dir_mode
 
     input:
     path gtf                     

@@ -1,6 +1,6 @@
 process BAMBU_PREP {
     tag "bambu_prep"
-    publishDir "${params.outdir}/bambu", mode: 'copy'
+    publishDir "${params.outdir}/bambu", mode: params.publish_dir_mode
 
     input:
     path gtf
@@ -20,7 +20,7 @@ process BAMBU_PREP {
 
 process BAMBU {
     tag "bambu"
-    publishDir "${params.outdir}/bambu", mode: 'copy'
+    publishDir "${params.outdir}/bambu", mode: params.publish_dir_mode
 
     input:
     path bams
