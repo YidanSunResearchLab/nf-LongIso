@@ -11,7 +11,7 @@ include { validateParameters; paramsSummaryLog; samplesheetToList } from 'plugin
 include { MINIMAP2_INDEX; JUNC_BED; MINIMAP2_ALIGN; SAMTOOLS_INDEX; SAMTOOLS_FAIDX; GTF_INTRONS;
           SAMTOOLS_STATS; EXTRACT_JUNCTIONS; MAKE_BIGWIG }                    from './modules/align.nf'
 include { BAMBU_PREP; BAMBU }                                                  from './modules/bambu.nf'
-include { SUPPA2 }                                                             from './modules/suppa2.nf'
+include { SUPPA2; SUPPA2_DIFFSPLICE }                                          from './modules/suppa2.nf'
 include { TE_ANALYSIS }                                                        from './modules/te_analysis.nf'
 include { DESEQ2 as DESEQ2_GENE; DESEQ2 as DESEQ2_TRANSCRIPT;
           TE_DESEQ2 as TE_DESEQ2_FAMILY; TE_DESEQ2 as TE_DESEQ2_INSTANCE }   from './modules/deseq2.nf'
@@ -106,6 +106,9 @@ workflow {
     def samples   = readSamplesheet(params.samplesheet, params.input_type, covariates)
     def reference = resolveReference(samples, params.reference_condition)
     def conditions = samples.collect { s -> s[0].condition }.unique().sort()
+    def n_reps = conditions.collectEntries { c -> [ (c): samples.count { s -> s[0].condition == c } ] }
+    // SUPPA2 diffSplice: each non-reference condition with >= 2 replicates vs a reference with >= 2 replicates
+    def diff_conditions = n_reps[reference] >= 2 ? conditions.findAll { c -> c != reference && n_reps[c] >= 2 } : []
     log.info """
         Run settings
           Input type          : ${params.input_type} (${samples.size()} samples)
@@ -116,6 +119,7 @@ workflow {
           TE analysis         : ${params.te_gtf ? "on (${params.te_gtf}); te_count_mode=${params.te_count_mode}, te_min_overlap=${params.te_min_overlap}, te_strand=${params.te_strand}" : 'off (no --te_gtf)'}
           minimap2            : ${params.input_type == 'fastq' ? "preset=${params.minimap2_preset}, junc_bed=${params.minimap2_junc_bed}, index=${params.minimap2_index ?: 'built by the pipeline'}, args='${params.minimap2_args}'" : 'not used (BAM input)'}
           Tool arguments      : bamCoverage='${params.bamcoverage_args}', bambu='${params.bambu_args}', SUPPA2 events='${params.suppa2_events}'
+          SUPPA2 diffSplice   : ${!params.suppa2_diff ? 'off' : diff_conditions ? "${diff_conditions.join(', ')} vs ${reference}; ${params.suppa2_diff_args}" : 'skipped (needs >= 2 replicates in the reference and another condition)'}
           proActiv            : species=${params.proactiv_species}; ${params.proactiv_altprom_args}
           Output directory    : ${params.outdir}
         """.stripIndent()
@@ -213,6 +217,19 @@ workflow {
     DESEQ2_GENE(BAMBU.out.gene_counts, ch_design, 'gene', reference)
     DESEQ2_TRANSCRIPT(ch_transcript_counts, ch_design, 'transcript', reference)
     SUPPA2(ch_extended_gtf, ch_transcript_counts)
+    if (params.suppa2_diff && diff_conditions) {
+        def no_reps = conditions.findAll { c -> c != reference && !(c in diff_conditions) }
+        if (no_reps) {
+            log.warn "SUPPA2 diffSplice: condition(s) ${no_reps.join(', ')} have fewer than 2 replicates and are not compared"
+        }
+        if (covariates) {
+            log.warn "SUPPA2 diffSplice does not model the design covariates (${covariates.join(', ')}); it compares conditions only"
+        }
+        SUPPA2_DIFFSPLICE(SUPPA2.out.ioe, SUPPA2.out.psi_per_sample, ch_transcript_abundance, ch_design, reference, diff_conditions)
+        ch_versions = ch_versions.mix(SUPPA2_DIFFSPLICE.out.versions)
+    } else if (params.suppa2_diff) {
+        log.warn "SUPPA2 diffSplice skipped: it needs >= 2 replicates in the reference condition (${reference}) and in at least one other condition"
+    }
     // Alternative polyadenylation (DEXSeq on PAS clusters)
     APA(ch_extended_gtf, ch_transcript_counts, ch_design, reference, file(params.genome), ch_fai)
     ch_versions = ch_versions.mix(APA.out.versions)

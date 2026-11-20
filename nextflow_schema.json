@@ -161,14 +161,6 @@
                     "description": "Extra R arguments added to the bambu() call, e.g. 'NDR = 0.1'. Use double quotes for R strings.",
                     "help_text": "Do not repeat arguments set by the pipeline (reads, annotations, genome, discovery, quant, ncore, lowMemory, verbose).",
                     "errorMessage": "--bambu_args must not contain single quotes; use double quotes for R strings, e.g. --bambu_args='opt.discovery = list(prefix = \"Tx\")'"
-                },
-                "suppa2_events": {
-                    "type": "string",
-                    "default": "SE SS MX RI FL",
-                    "fa_icon": "fas fa-list",
-                    "pattern": "^((SE|SS|MX|RI|FL)( |$))+$",
-                    "description": "SUPPA2 generateEvents event types (space-separated subset of SE SS MX RI FL).",
-                    "errorMessage": "--suppa2_events must be a space-separated subset of: SE SS MX RI FL"
                 }
             }
         },
@@ -230,6 +222,54 @@
                     "maximum": 1,
                     "fa_icon": "fas fa-filter",
                     "description": "Gene-level q-value cutoff (DEXSeq perGeneQValue) for differential PAS and promoter usage."
+                }
+            }
+        },
+        "splicing_options": {
+            "title": "Alternative splicing options (SUPPA2)",
+            "type": "object",
+            "fa_icon": "fas fa-random",
+            "description": "Splicing events, PSI and differential splicing with SUPPA2.",
+            "properties": {
+                "suppa2_events": {
+                    "type": "string",
+                    "default": "SE SS MX RI FL",
+                    "fa_icon": "fas fa-list",
+                    "pattern": "^((SE|SS|MX|RI|FL)( |$))+$",
+                    "description": "SUPPA2 generateEvents event types (space-separated subset of SE SS MX RI FL).",
+                    "errorMessage": "--suppa2_events must be a space-separated subset of: SE SS MX RI FL"
+                },
+                "suppa2_diff": {
+                    "type": "boolean",
+                    "default": true,
+                    "fa_icon": "fas fa-toggle-on",
+                    "description": "Run SUPPA2 diffSplice for each non-reference condition vs the reference.",
+                    "help_text": "Runs only for conditions with at least 2 replicates, and only when the reference has at least 2 replicates. diffSplice does not model design covariates."
+                },
+                "suppa2_diff_args": {
+                    "type": "string",
+                    "default": "-m empirical -gc",
+                    "fa_icon": "fas fa-terminal",
+                    "pattern": "^[^'\"]*$",
+                    "description": "Options passed to suppa.py diffSplice (method, gene correction, ...).",
+                    "help_text": "Do not set the options given by the pipeline (-i, -p, -e, -o). See the SUPPA2 documentation for -m, -gc, -a, -l, -pa, -s, -c.",
+                    "errorMessage": "--suppa2_diff_args must not contain quotes"
+                },
+                "suppa2_alpha": {
+                    "type": "number",
+                    "default": 0.05,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "fa_icon": "fas fa-filter",
+                    "description": "p-value cutoff for the combined SUPPA2 significant-event table."
+                },
+                "suppa2_dpsi_cutoff": {
+                    "type": "number",
+                    "default": 0.1,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "fa_icon": "fas fa-filter",
+                    "description": "|dPSI| cutoff for the combined SUPPA2 significant-event table."
                 }
             }
         },
@@ -471,6 +511,9 @@
         },
         {
             "$ref": "#/$defs/differential_analysis_options"
+        },
+        {
+            "$ref": "#/$defs/splicing_options"
         },
         {
             "$ref": "#/$defs/apa_options"
