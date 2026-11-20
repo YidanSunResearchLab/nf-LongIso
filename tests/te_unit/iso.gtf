@@ -1,0 +1,14 @@
+chrT	Bambu	transcript	1000	3100	.	+	.	gene_id "G1"; transcript_id "R1";
+chrT	Bambu	exon	1000	1100	.	+	.	gene_id "G1"; transcript_id "R1";
+chrT	Bambu	exon	3000	3100	.	+	.	gene_id "G1"; transcript_id "R1";
+chrT	Bambu	transcript	1000	3100	.	+	.	gene_id "G1"; transcript_id "N1";
+chrT	Bambu	exon	1000	1100	.	+	.	gene_id "G1"; transcript_id "N1";
+chrT	Bambu	exon	1500	1600	.	+	.	gene_id "G1"; transcript_id "N1";
+chrT	Bambu	exon	2000	2100	.	+	.	gene_id "G1"; transcript_id "N1";
+chrT	Bambu	exon	3000	3100	.	+	.	gene_id "G1"; transcript_id "N1";
+chrT	Bambu	transcript	5000	5200	.	+	.	gene_id "BambuGene1"; transcript_id "N2";
+chrT	Bambu	exon	5000	5200	.	+	.	gene_id "BambuGene1"; transcript_id "N2";
+chrT	Bambu	transcript	1000	3100	.	+	.	gene_id "G1"; transcript_id "N3";
+chrT	Bambu	exon	1000	1100	.	+	.	gene_id "G1"; transcript_id "N3";
+chrT	Bambu	exon	2500	2580	.	+	.	gene_id "G1"; transcript_id "N3";
+chrT	Bambu	exon	3000	3100	.	+	.	gene_id "G1"; transcript_id "N3";

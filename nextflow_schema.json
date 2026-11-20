@@ -234,6 +234,50 @@
                 }
             }
         },
+        "te_options": {
+            "title": "Transposable element options",
+            "type": "object",
+            "fa_icon": "fas fa-dna",
+            "description": "Used when --te_gtf is given.",
+            "properties": {
+                "te_count_mode": {
+                    "type": "string",
+                    "default": "exon",
+                    "enum": [
+                        "exon",
+                        "span"
+                    ],
+                    "fa_icon": "fas fa-calculator",
+                    "description": "TE quantification: 'exon' counts transcripts whose exons overlap a TE; 'span' reproduces v0.1.0 (overlap with the whole transcript span).",
+                    "help_text": "Use 'span' to reproduce results produced with v0.1.0 (Bioinformatics 2026). See 'TE quantification modes' in the README."
+                },
+                "te_min_overlap": {
+                    "type": "integer",
+                    "default": 20,
+                    "minimum": 1,
+                    "fa_icon": "fas fa-ruler-horizontal",
+                    "description": "Minimum exon-TE overlap in bp (exon mode and isoform_TE_annotation.tsv)."
+                },
+                "te_strand": {
+                    "type": "string",
+                    "default": "sense",
+                    "enum": [
+                        "sense",
+                        "both"
+                    ],
+                    "fa_icon": "fas fa-exchange-alt",
+                    "description": "Count TEs on the transcript strand only ('sense') or on either strand ('both'). Exon mode and annotation."
+                },
+                "te_autonomous_frac": {
+                    "type": "number",
+                    "default": 0.5,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "fa_icon": "fas fa-percentage",
+                    "description": "Minimum fraction of a transcript's exonic length covered by one TE for category 'autonomous'."
+                }
+            }
+        },
         "resource_options": {
             "title": "Resource limits",
             "type": "object",
@@ -311,6 +355,9 @@
         },
         {
             "$ref": "#/$defs/promoter_options"
+        },
+        {
+            "$ref": "#/$defs/te_options"
         },
         {
             "$ref": "#/$defs/resource_options"

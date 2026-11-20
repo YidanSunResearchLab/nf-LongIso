@@ -1,0 +1,6 @@
+chrT	rmsk	exon	1495	1605	100	+	.	gene_id "AluY"; transcript_id "AluY_dup1"; family_id "Alu"; class_id "SINE";
+chrT	rmsk	exon	1990	2110	100	+	.	gene_id "L1M"; transcript_id "L1M_dup2"; family_id "L1"; class_id "LINE";
+chrT	rmsk	exon	1050	1080	100	+	.	gene_id "MIR"; transcript_id "MIR_dup3"; family_id "MIR"; class_id "SINE";
+chrT	rmsk	exon	5000	5150	100	+	.	gene_id "L2"; transcript_id "L2_dup4"; family_id "L2"; class_id "LINE";
+chrT	rmsk	exon	3050	3090	100	-	.	gene_id "AluSx"; transcript_id "AluSx_dup5"; family_id "Alu"; class_id "SINE";
+chrT	rmsk	exon	2495	2590	100	+	.	gene_id "MER5A"; transcript_id "MER5A_dup6"; family_id "hAT-Charlie"; class_id "DNA";

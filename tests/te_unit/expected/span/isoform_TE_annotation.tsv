@@ -1,0 +1,8 @@
+transcript_id	gene_id	TE_id	subfamily	family	class	TE_chr	TE_start	TE_end	TE_strand	overlap_bp	TE_fraction_of_transcript	strand_relation	category	junction_supported
+N1	G1	AluY_dup1	AluY	Alu	SINE	chrT	1494	1605	+	101	0.2500	sense	internal_exonization	yes
+N1	G1	L1M_dup2	L1M	L1	LINE	chrT	1989	2110	+	101	0.2500	sense	internal_exonization	yes
+N1	G1	MIR_dup3	MIR	MIR	SINE	chrT	1049	1080	+	31	0.0767	sense	TSS	yes
+N2	BambuGene1	L2_dup4	L2	L2	LINE	chrT	4999	5150	+	151	0.7512	sense	autonomous	NA
+N3	G1	MER5A_dup6	MER5A	hAT-Charlie	DNA	chrT	2494	2590	+	81	0.2862	sense	internal_exonization	no
+N3	G1	MIR_dup3	MIR	MIR	SINE	chrT	1049	1080	+	31	0.1095	sense	TSS	yes
+R1	G1	MIR_dup3	MIR	MIR	SINE	chrT	1049	1080	+	31	0.1535	sense	TSS	yes

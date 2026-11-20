@@ -1,0 +1,3 @@
+transcript_id	gene_id	exon_chr	exon_start	exon_end	TE_id	TE_chr	TE_start	TE_end	s1	s2
+N1	G1	chrT	1499	1600	AluY_dup1	chrT	1494	1605	5	7
+N1	G1	chrT	1999	2100	L1M_dup2	chrT	1989	2110	5	7

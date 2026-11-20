@@ -1,0 +1,5 @@
+TXNAME	GENEID	s1.sorted	s2.sorted
+R1	G1	10	20
+N1	G1	5	7
+N2	BambuGene1	3	4
+N3	G1	2	2

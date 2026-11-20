@@ -87,3 +87,25 @@ the Bambu GTF (no version stripping), so that the expression file and the `.ioe`
 files use identical IDs. After the fix, the PSI nan fraction should drop sharply; the
 remaining nan values should come only from events whose transcripts have zero total
 expression in a sample.
+
+## V3 (found while fixing issue 10/12): junction validation of `isoform_TE_exonization.tsv`
+
+The v0.1.0 exonization step validates a TE-derived novel exon by intersecting 10-bp windows
+around both exon ends with the junction BEDs and then requiring that the transcript ID occurs
+exactly twice in the combined "left ok" + "right ok" list. On the synthetic locus in
+`tests/te_unit/` (bedtools container, v0.1.0 code rendered from the `v0.1.0` tag):
+
+| Transcript | Situation | Expected | v0.1.0 | v0.2.0 |
+|---|---|---|---|---|
+| N1 | two novel intronic exons, each fully covered by a TE (AluY, L1M), both ends of both exons matched by observed junctions | 2 rows | **0 rows** (the ID occurs 4 times, not 2) | 2 rows |
+| N3 | novel intronic exon fully covered by MER5A; the only junction skips the exon (spans it) | 0 rows | **1 row** (a spanning junction overlaps both windows) | 0 rows |
+
+v0.2.0 validates each exon separately and requires an observed junction **endpoint** within
+±5 bp of each exon boundary (a junction ending at the exon start and one starting at the exon
+end), and keeps every (transcript, exon, TE) combination instead of one TE per transcript.
+
+The same test confirms that `--te_count_mode span` reproduces the v0.1.0 family and instance
+counts (including the v0.1.0 behaviour that a transcript overlapping several TEs contributes
+only to the last one reported by bedtools). On the tiny test dataset, span-mode
+`TE_family_counts.tsv` (116 rows) and `TE_instance_counts.tsv` (610 rows) are identical to the
+v0.1.0 module's output.
