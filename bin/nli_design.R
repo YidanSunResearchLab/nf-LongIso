@@ -75,3 +75,16 @@ check_full_rank <- function(formula, coldata) {
     invisible(TRUE)
 }
 
+
+# DESeq() with the fallback recommended by DESeq2 when the dispersion trend cannot be fitted
+# (all gene-wise estimates within two orders of magnitude, typical for very small tables or designs
+# with few residual degrees of freedom): use the gene-wise dispersion estimates, then the Wald test.
+run_deseq <- function(dds) {
+    tryCatch(DESeq2::DESeq(dds), error = function(e) {
+        if (!grepl("dispersion estimates are within 2 orders of magnitude", conditionMessage(e))) stop(e)
+        warning("DESeq2 could not fit a dispersion trend; using gene-wise dispersion estimates")
+        dds <- DESeq2::estimateDispersionsGeneEst(dds)
+        DESeq2::dispersions(dds) <- S4Vectors::mcols(dds)$dispGeneEst
+        DESeq2::nbinomWaldTest(dds)
+    })
+}

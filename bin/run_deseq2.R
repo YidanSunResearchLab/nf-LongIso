@@ -89,7 +89,7 @@ invisible(dev.off())
 level_label <- if (opt$level == "gene") "genes" else "transcripts"
 mqc_rows <- list()
 if (length(conditions) > 1) {
-    dds <- DESeq(dds)
+    dds <- run_deseq(dds)
     others <- setdiff(conditions, reference)
     for (cond in others) {
         res <- as.data.frame(results(dds, contrast = c("condition", cond, reference)))

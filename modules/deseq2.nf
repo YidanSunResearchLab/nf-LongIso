@@ -52,7 +52,7 @@ process TE_DESEQ2 {
 
     input:
     path te_counts
-    path tx_counts
+    path gene_counts       // Bambu counts_gene.txt (size factors)
     path design
     val  type              // 'Family' or 'Instance'
     val  reference
@@ -68,7 +68,7 @@ process TE_DESEQ2 {
     """
     run_te_deseq2.R \\
         --te-counts=${te_counts} \\
-        --tx-counts=${tx_counts} \\
+        --gene-counts=${gene_counts} \\
         --design=${design} \\
         --design-formula='${params.design}' \\
         --type=${type} \\

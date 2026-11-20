@@ -192,8 +192,9 @@ workflow {
             ch_all_junctions,
             file(params.gtf)
         )
-        TE_DESEQ2_FAMILY(TE_ANALYSIS.out.te_counts, ch_transcript_counts, ch_design, "Family", reference)
-        TE_DESEQ2_INSTANCE(TE_ANALYSIS.out.te_instances, ch_transcript_counts, ch_design, "Instance", reference)
+        // TE size factors come from the gene-level counts
+        TE_DESEQ2_FAMILY(TE_ANALYSIS.out.te_counts, BAMBU.out.gene_counts, ch_design, "Family", reference)
+        TE_DESEQ2_INSTANCE(TE_ANALYSIS.out.te_instances, BAMBU.out.gene_counts, ch_design, "Instance", reference)
         ch_versions = ch_versions.mix(TE_ANALYSIS.out.versions, TE_DESEQ2_FAMILY.out.versions, TE_DESEQ2_INSTANCE.out.versions)
     }
 
