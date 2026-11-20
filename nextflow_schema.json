@@ -10,7 +10,12 @@
             "type": "object",
             "fa_icon": "fas fa-terminal",
             "description": "Samplesheet, reference files and output directory.",
-            "required": ["samplesheet", "genome", "gtf", "outdir"],
+            "required": [
+                "samplesheet",
+                "genome",
+                "gtf",
+                "outdir"
+            ],
             "properties": {
                 "samplesheet": {
                     "type": "string",
@@ -26,7 +31,10 @@
                 "input_type": {
                     "type": "string",
                     "default": "fastq",
-                    "enum": ["fastq", "bam"],
+                    "enum": [
+                        "fastq",
+                        "bam"
+                    ],
                     "description": "Input data type. 'fastq' aligns reads with minimap2; 'bam' starts from coordinate-sorted BAM files.",
                     "fa_icon": "fas fa-file-import"
                 },
@@ -64,7 +72,14 @@
                 "publish_dir_mode": {
                     "type": "string",
                     "default": "copy",
-                    "enum": ["symlink", "rellink", "link", "copy", "copyNoFollow", "move"],
+                    "enum": [
+                        "symlink",
+                        "rellink",
+                        "link",
+                        "copy",
+                        "copyNoFollow",
+                        "move"
+                    ],
                     "description": "How result files are published to --outdir.",
                     "fa_icon": "fas fa-copy",
                     "hidden": true
@@ -80,7 +95,10 @@
                 "minimap2_preset": {
                     "type": "string",
                     "default": "splice",
-                    "enum": ["splice", "splice:hq"],
+                    "enum": [
+                        "splice",
+                        "splice:hq"
+                    ],
                     "description": "minimap2 preset (-x/-ax). Use 'splice:hq' for PacBio Iso-Seq or other high-accuracy reads.",
                     "fa_icon": "fas fa-sliders-h"
                 },
@@ -110,6 +128,109 @@
                     "default": "",
                     "description": "Extra options for building the minimap2 index (e.g. -k, -w, -H). Ignored when --minimap2_index is given.",
                     "fa_icon": "fas fa-terminal"
+                }
+            }
+        },
+        "tool_argument_options": {
+            "title": "Tool arguments",
+            "type": "object",
+            "fa_icon": "fas fa-sliders-h",
+            "description": "Extra options appended after the pipeline defaults. Use --param=\"value\" when the value starts with '-'.",
+            "properties": {
+                "bamcoverage_args": {
+                    "type": "string",
+                    "default": "",
+                    "fa_icon": "fas fa-terminal",
+                    "description": "Extra deepTools bamCoverage options, appended after the defaults (--binSize 5 --minMappingQuality 5 --normalizeUsing CPM --skipNonCoveredRegions).",
+                    "help_text": "bamCoverage keeps the last value of a repeated option, so e.g. --bamcoverage_args=\"--binSize 10\" overrides the default bin size."
+                },
+                "bambu_args": {
+                    "type": "string",
+                    "default": "",
+                    "fa_icon": "fas fa-terminal",
+                    "pattern": "^[^']*$",
+                    "description": "Extra R arguments added to the bambu() call, e.g. 'NDR = 0.1'. Use double quotes for R strings.",
+                    "help_text": "Do not repeat arguments set by the pipeline (reads, annotations, genome, discovery, quant, ncore, lowMemory, verbose).",
+                    "errorMessage": "--bambu_args must not contain single quotes; use double quotes for R strings, e.g. --bambu_args='opt.discovery = list(prefix = \"Tx\")'"
+                },
+                "suppa2_events": {
+                    "type": "string",
+                    "default": "SE SS MX RI FL",
+                    "fa_icon": "fas fa-list",
+                    "pattern": "^((SE|SS|MX|RI|FL)( |$))+$",
+                    "description": "SUPPA2 generateEvents event types (space-separated subset of SE SS MX RI FL).",
+                    "errorMessage": "--suppa2_events must be a space-separated subset of: SE SS MX RI FL"
+                }
+            }
+        },
+        "differential_analysis_options": {
+            "title": "Differential analysis options",
+            "type": "object",
+            "fa_icon": "fas fa-balance-scale",
+            "description": "Comparisons for DESeq2, TE DESeq2, IsoformSwitchAnalyzeR and proActiv.",
+            "properties": {
+                "reference_condition": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "fa_icon": "fas fa-flag",
+                    "description": "Reference condition. Default: 'control' if present, otherwise the alphabetically first condition.",
+                    "help_text": "Every other condition is compared with the reference; fold changes, dIF and dPAU are <condition> relative to the reference."
+                },
+                "isoswitch_alpha": {
+                    "type": "number",
+                    "default": 0.05,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "fa_icon": "fas fa-filter",
+                    "description": "q-value cutoff for significant isoform switches and APA sites."
+                },
+                "isoswitch_dif_cutoff": {
+                    "type": "number",
+                    "default": 0.1,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "fa_icon": "fas fa-filter",
+                    "description": "Minimum |dIF| for significant isoform switches (IsoformSwitchAnalyzeR default 0.1)."
+                },
+                "seed": {
+                    "type": "integer",
+                    "default": 42,
+                    "fa_icon": "fas fa-dice",
+                    "description": "Random seed (simulated p-values of the APA Fisher tests)."
+                }
+            }
+        },
+        "promoter_options": {
+            "title": "Promoter analysis options (proActiv)",
+            "type": "object",
+            "fa_icon": "fas fa-play",
+            "properties": {
+                "proactiv_species": {
+                    "type": "string",
+                    "default": "Homo_sapiens",
+                    "fa_icon": "fas fa-paw",
+                    "enum": [
+                        "Arabidopsis_thaliana",
+                        "Caenorhabditis_elegans",
+                        "Canis_familiaris",
+                        "Cyanidioschyzon_merolae",
+                        "Drosophila_melanogaster",
+                        "Gossypium_hirsutum",
+                        "Homo_sapiens",
+                        "Mus_musculus",
+                        "Oryza_sativa",
+                        "Populus_trichocarpa",
+                        "Rattus_norvegicus",
+                        "Saccharomyces_cerevisiae",
+                        "Zea_mays"
+                    ],
+                    "description": "Species for proActiv's standard-chromosome filter (GenomeInfoDb species name)."
+                },
+                "proactiv_altprom_args": {
+                    "type": "string",
+                    "fa_icon": "fas fa-terminal",
+                    "default": "minAbs = 0.25, minRel = 0.05, maxPval = 0.05, promoterFC = 2.0, geneFC = 1.5",
+                    "description": "R arguments for getAlternativePromoters() (thresholds for alternative promoters)."
                 }
             }
         },
@@ -176,10 +297,29 @@
         }
     },
     "allOf": [
-        { "$ref": "#/$defs/input_output_options" },
-        { "$ref": "#/$defs/alignment_options" },
-        { "$ref": "#/$defs/resource_options" },
-        { "$ref": "#/$defs/hpc_options" },
-        { "$ref": "#/$defs/generic_options" }
+        {
+            "$ref": "#/$defs/input_output_options"
+        },
+        {
+            "$ref": "#/$defs/alignment_options"
+        },
+        {
+            "$ref": "#/$defs/tool_argument_options"
+        },
+        {
+            "$ref": "#/$defs/differential_analysis_options"
+        },
+        {
+            "$ref": "#/$defs/promoter_options"
+        },
+        {
+            "$ref": "#/$defs/resource_options"
+        },
+        {
+            "$ref": "#/$defs/hpc_options"
+        },
+        {
+            "$ref": "#/$defs/generic_options"
+        }
     ]
 }

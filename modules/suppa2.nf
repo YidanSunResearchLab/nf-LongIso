@@ -1,93 +1,59 @@
+/*
+ * Alternative splicing events and PSI (SUPPA2)
+ */
+
 process SUPPA2 {
-    tag "suppa2_quant"
-    publishDir "${params.outdir}/suppa2", mode: params.publish_dir_mode
+    tag "suppa2"
+    publishDir "${params.outdir}/suppa2", mode: params.publish_dir_mode, pattern: "{events_*.ioe,psi/*.psi}"
 
     input:
-    path gtf                     
-    path counts                  
+    path gtf          // Bambu extended_annotations.gtf
+    path counts       // Bambu counts_transcript.txt (TXNAME, GENEID, samples...)
 
     output:
-    path "events_*.ioe", emit: ioe
-    path "psi/*.psi", emit: psi_per_sample
-    path "psi/*_filtered.psi", emit: psi_filtered   
+    path "events_*.ioe"              , emit: ioe
+    path "psi/*_samples.psi"         , emit: psi_per_sample
+    path "psi/*_samples_filtered.psi", emit: psi_filtered
+    path "versions.yml"              , emit: versions
 
     script:
     """
-    rm -rf events_* psi cleaned_counts.txt || true
+    # SUPPA2 expression file: header = sample names only; rows = transcript ID + values.
+    # Transcript IDs are kept exactly as in the Bambu GTF (including versions such as
+    # ENST00000456328.2), so that they match the transcript IDs in the .ioe event files.
+    awk 'BEGIN { FS = OFS = "\\t" }
+        NR == 1 {
+            out = ""
+            for (i = 3; i <= NF; i++) { n = \$i; sub(/[.]sorted([.]bam)?\$/, "", n); out = out (i > 3 ? OFS : "") n }
+            print out
+            next
+        }
+        { out = \$1; for (i = 3; i <= NF; i++) out = out OFS \$i; print out }' ${counts} > expression.tsv
+    echo "Expression file: \$(( \$(wc -l < expression.tsv) - 1 )) transcripts; samples: \$(head -n 1 expression.tsv | tr '\\t' ' ')"
 
-    # 1. Clean expression file + strip version numbers from IDs
-    python3 -c "
-import re
-import sys
+    suppa.py generateEvents -i ${gtf} -f ioe -e ${params.suppa2_events} -o events
 
-with open('${counts}', 'r') as f_in, open('cleaned_counts.txt', 'w') as f_out:
-    header_line = next(f_in).rstrip('\\n').split('\\t')
-    sample_names = header_line[2:]
-    sample_names = [re.sub(r'[.]sorted([.]bam)?\$', '', s.strip()) for s in sample_names]
-    
-    if not sample_names:
-        sys.exit('Error: No sample columns detected in header')
-    
-    f_out.write('\\t'.join(sample_names) + '\\n')
-    
-    for line in f_in:
-        parts = line.rstrip('\\n').split('\\t')
-        n_samples = len(sample_names)
-        if len(parts) >= n_samples + 2:
-            tx_id = parts[0].split('.')[0]          # <- remove version suffix
-            out_row = [tx_id] + parts[2 : 2 + n_samples]
-            if len(out_row) == n_samples + 1:
-                f_out.write('\\t'.join(out_row) + '\\n')
-
-print('Detected sample names:', ', '.join(sample_names))
-print('Number of samples:', len(sample_names))
-"
-
-    # Debug: show what we produced
-    echo "=== cleaned_counts.txt (first 10 lines) ==="
-    head -n 10 cleaned_counts.txt || echo "File is empty!"
-    echo ""
-    echo "Field counts:"
-    awk -F'\\t' '{print \"Line \" NR \": \" NF \" fields\"}' cleaned_counts.txt | head -n 10
-
-    # 2. Generate events
-    suppa.py generateEvents -i ${gtf} -f ioe -e SE SS MX RI FL -o events
-
-    # 3. Calculate PSI
     mkdir -p psi
-
     for ioe_file in events_*_strict.ioe; do
-        if [ -s "\$ioe_file" ]; then
-            prefix=\$(basename \$ioe_file _strict.ioe)
-            echo "Calculating PSI for: \$prefix"
+        [ -s "\$ioe_file" ] || continue
+        prefix=\$(basename "\$ioe_file" _strict.ioe)
+        suppa.py psiPerEvent -i "\$ioe_file" -e expression.tsv -o "psi/\${prefix}_samples"
 
-            suppa.py psiPerEvent \
-                -i "\$ioe_file" \
-                -e cleaned_counts.txt \
-                -o "psi/\${prefix}_samples"
-
-                        # 4. Filter: keep events with non-NaN in ≥ 2 samples
-            psi_file="psi/\${prefix}_samples.psi"
-            filtered_file="psi/\${prefix}_samples_filtered.psi"
-
-            if [ -s "\$psi_file" ]; then
-                awk -v samples=\$(awk -F'\\t' 'NR==1 {print NF}' "\$psi_file") '
-                NR==1 {print; next}
-                {
-                    non_nan = 0
-                    for (i=2; i<=samples; i++) {          # use the passed variable
-                        if (\$i != "nan" && \$i != "NA" && \$i != "") non_nan++
-                    }
-                    if (non_nan >= 2) print
-                }' "\$psi_file" > "\$filtered_file"
-
-                echo "Filtered \$psi_file → \$filtered_file (≥2 non-NaN PSI values)"
-                echo "  Original lines: \$(wc -l < "\$psi_file")"
-                echo "  Filtered lines: \$(wc -l < "\$filtered_file")"
-            else
-                echo "No PSI file produced for \$prefix"
-            fi
+        # Keep events with a PSI value (not nan) in at least 2 samples; data rows are
+        # event_id + one column per sample (the header has the sample names only)
+        psi_file="psi/\${prefix}_samples.psi"
+        if [ -s "\$psi_file" ]; then
+            awk 'BEGIN { FS = "\\t" }
+                NR == 1 { print; next }
+                { n = 0; for (i = 2; i <= NF; i++) if (\$i != "nan" && \$i != "NA" && \$i != "") n++; if (n >= 2) print }' \\
+                "\$psi_file" > "psi/\${prefix}_samples_filtered.psi"
+            echo "\$prefix: \$(( \$(wc -l < "\$psi_file") - 1 )) events, \$(( \$(wc -l < "psi/\${prefix}_samples_filtered.psi") - 1 )) with PSI in >= 2 samples"
         fi
     done
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        suppa: \$(python3 -c "import importlib.metadata as m; print(m.version('suppa'))" 2>/dev/null || echo 2.4)
+    END_VERSIONS
     """
 }

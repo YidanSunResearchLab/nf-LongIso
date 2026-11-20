@@ -7,6 +7,7 @@ process BAMBU_PREP {
 
     output:
     path "bambu_annotations.rds", emit: annot_rds
+    path "versions.yml"         , emit: versions
 
     script:
     """
@@ -15,6 +16,11 @@ process BAMBU_PREP {
     annot <- prepareAnnotations("${gtf}")
     saveRDS(annot, "bambu_annotations.rds")
     '
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        bioconductor-bambu: \$(Rscript -e 'cat(as.character(packageVersion("bambu")))')
+    END_VERSIONS
     """
 }
 
@@ -34,8 +40,17 @@ process BAMBU {
     path "counts_transcript.txt",    emit: transcript_counts
     path "counts_gene.txt",          emit: gene_counts
     path "CPM_transcript.txt",       emit: transcript_abundance
+    path "versions.yml",             emit: versions
 
     script:
+    // Extra arguments are spliced into the bambu() call inside a single-quoted Rscript -e
+    // program, so they must not contain single quotes (use double quotes for R strings).
+    def args = task.ext.args ?: ''
+    if (args.contains("'")) {
+        error "--bambu_args must not contain single quotes; use double quotes for R strings (got: ${args})"
+    }
+    def extra     = args ? ", ${args}" : ''
+    def extra_msg = args ? args.replace('"', '\\"') : 'none'   // escaped for the R print() string
     """
     Rscript -e '
     library(bambu)
@@ -54,6 +69,7 @@ process BAMBU {
     print(bam_paths)
 
     print("Running Bambu...")
+    print("Extra bambu() arguments: ${extra_msg}")
     se <- bambu(
         reads       = bam_paths,
         annotations = readRDS("${annot_rds}"),
@@ -62,7 +78,7 @@ process BAMBU {
         quant       = TRUE,
         ncore       = ${task.cpus},
         lowMemory   = TRUE,
-        verbose     = FALSE
+        verbose     = FALSE${extra}
     )
 
     print("Writing output files...")
@@ -107,5 +123,10 @@ process BAMBU {
     saveRDS(se, "bambu_results.rds")
     print("Bambu completed successfully!")
     '
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        bioconductor-bambu: \$(Rscript -e 'cat(as.character(packageVersion("bambu")))')
+    END_VERSIONS
     """
 }

@@ -13,7 +13,8 @@ include { MINIMAP2_INDEX; JUNC_BED; MINIMAP2_ALIGN; SAMTOOLS_INDEX;
 include { BAMBU_PREP; BAMBU }                                                  from './modules/bambu.nf'
 include { SUPPA2 }                                                             from './modules/suppa2.nf'
 include { TE_ANALYSIS }                                                        from './modules/te_analysis.nf'
-include { DESEQ2; TE_DESEQ2 as TE_DESEQ2_FAMILY; TE_DESEQ2 as TE_DESEQ2_INSTANCE } from './modules/deseq2.nf'
+include { DESEQ2 as DESEQ2_GENE; DESEQ2 as DESEQ2_TRANSCRIPT;
+          TE_DESEQ2 as TE_DESEQ2_FAMILY; TE_DESEQ2 as TE_DESEQ2_INSTANCE }   from './modules/deseq2.nf'
 include { ISOSWITCH }                                                          from './modules/isoswitch.nf'
 include { PROACTIV }                                                           from './modules/proactiv.nf'
 include { MULTIQC }                                                            from './modules/multiqc.nf'
@@ -41,6 +42,21 @@ def readSamplesheet(samplesheet, input_type) {
     return samples
 }
 
+/*
+ * Reference condition for all comparisons: --reference_condition if given, otherwise
+ * 'control' if present, otherwise the alphabetically first condition.
+ */
+def resolveReference(samples, requested) {
+    def conditions = samples.collect { s -> s[0].condition }.unique().sort()
+    if (requested) {
+        if (!conditions.contains(requested)) {
+            error "--reference_condition '${requested}' is not a condition in the samplesheet (conditions: ${conditions.join(', ')})"
+        }
+        return requested
+    }
+    return conditions.contains('control') ? 'control' : conditions[0]
+}
+
 workflow {
 
     validateParameters()
@@ -48,8 +64,11 @@ workflow {
     log.info paramsSummaryLog(workflow)
 
     // 1. INPUT
-    def samples = readSamplesheet(params.samplesheet, params.input_type)
-    ch_input    = channel.fromList(samples)
+    def samples   = readSamplesheet(params.samplesheet, params.input_type)
+    def reference = resolveReference(samples, params.reference_condition)
+    log.info "Reference condition: ${reference}" +
+             (params.reference_condition ? '' : ' (not set with --reference_condition; chosen automatically)')
+    ch_input = channel.fromList(samples)
 
     // Normalised design table (sample,condition) used by all R steps
     ch_design = channel.fromList(samples)
@@ -107,22 +126,18 @@ workflow {
             ch_all_junctions,
             file(params.gtf)
         )
-        TE_DESEQ2_FAMILY(TE_ANALYSIS.out.te_counts, ch_transcript_counts, ch_design, "Family")
-        TE_DESEQ2_INSTANCE(TE_ANALYSIS.out.te_instances, ch_transcript_counts, ch_design, "Instance")
+        TE_DESEQ2_FAMILY(TE_ANALYSIS.out.te_counts, ch_transcript_counts, ch_design, "Family", reference)
+        TE_DESEQ2_INSTANCE(TE_ANALYSIS.out.te_instances, ch_transcript_counts, ch_design, "Instance", reference)
     }
 
     // 6. ISOFORM SWITCHING, DE AND SPLICING
-    ISOSWITCH(ch_transcript_counts, ch_transcript_abundance, ch_extended_gtf, ch_design)
-    DESEQ2(ch_transcript_counts, ch_design, ch_extended_gtf)
+    ISOSWITCH(ch_transcript_counts, ch_transcript_abundance, ch_extended_gtf, ch_design, reference)
+    DESEQ2_GENE(BAMBU.out.gene_counts, ch_design, 'gene', reference)
+    DESEQ2_TRANSCRIPT(ch_transcript_counts, ch_design, 'transcript', reference)
     SUPPA2(ch_extended_gtf, ch_transcript_counts)
 
     // 7. PROMOTER ACTIVITY
-    PROACTIV(
-        ch_extended_gtf,
-        ch_bams_indexed.map { meta, _bam, _bai -> meta }.collect(),
-        ch_bams_for_cohort,
-        ch_bais_for_cohort
-    )
+    PROACTIV(ch_extended_gtf, ch_design, ch_bams_for_cohort, ch_bais_for_cohort, reference)
 
     // 8. MULTIQC
     MULTIQC(

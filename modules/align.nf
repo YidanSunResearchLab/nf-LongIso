@@ -225,6 +225,9 @@ process MAKE_BIGWIG {
     path "versions.yml", emit: versions
 
     script:
+    // Extra options are appended after the defaults; argparse keeps the last value of a
+    // repeated option, so e.g. --binSize 10 overrides --binSize 5.
+    def args = task.ext.args ?: ''
     """
     bamCoverage \\
         -b ${bam} \\
@@ -233,7 +236,8 @@ process MAKE_BIGWIG {
         --minMappingQuality 5 \\
         --normalizeUsing CPM \\
         --numberOfProcessors ${task.cpus} \\
-        --skipNonCoveredRegions
+        --skipNonCoveredRegions \\
+        ${args}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
