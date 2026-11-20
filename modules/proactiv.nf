@@ -4,7 +4,7 @@
 
 process PROACTIV {
     tag "proactiv"
-    publishDir "${params.outdir}/proactiv", mode: params.publish_dir_mode, pattern: "*.tsv"
+    publishDir "${params.outdir}/promoter", mode: params.publish_dir_mode, pattern: "*.tsv"
 
     input:
     path gtf

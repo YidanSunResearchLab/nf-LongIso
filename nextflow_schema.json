@@ -268,10 +268,48 @@
             }
         },
         "promoter_options": {
-            "title": "Promoter analysis options (proActiv)",
+            "title": "Promoter usage options",
             "type": "object",
             "fa_icon": "fas fa-play",
             "properties": {
+                "promoter_method": {
+                    "type": "string",
+                    "default": "tss",
+                    "enum": [
+                        "tss",
+                        "proactiv"
+                    ],
+                    "fa_icon": "fas fa-play",
+                    "description": "'tss': promoters = clusters of transcript 5' ends, counted with Bambu read counts and tested with DEXSeq; 'proactiv': proActiv on splice junctions (misses single-exon transcripts)."
+                },
+                "tss_cluster_window": {
+                    "type": "integer",
+                    "default": 50,
+                    "minimum": 0,
+                    "fa_icon": "fas fa-arrows-alt-h",
+                    "description": "Transcript 5' ends within this distance (bp) of the previous one join the same promoter (tss method)."
+                },
+                "tss_max_cluster_width": {
+                    "type": "integer",
+                    "default": 100,
+                    "minimum": 1,
+                    "fa_icon": "fas fa-ruler-horizontal",
+                    "description": "Maximal width of a promoter (TSS cluster) in bp (tss method)."
+                },
+                "promoter_min_activity": {
+                    "type": "number",
+                    "default": 0.25,
+                    "minimum": 0,
+                    "fa_icon": "fas fa-filter",
+                    "description": "Mean absolute activity (log2 normalised count + 1) below which a promoter is Inactive (proActiv default 0.25; tss method)."
+                },
+                "promoter_min_count": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 0,
+                    "fa_icon": "fas fa-sort-numeric-up",
+                    "description": "Minimal reads of a promoter over all samples for the differential usage test; genes need >= 2 promoters (tss method)."
+                },
                 "proactiv_species": {
                     "type": "string",
                     "default": "Homo_sapiens",
@@ -299,7 +337,8 @@
                     "default": "minAbs = 0.25, minRel = 0.05, maxPval = 0.05, promoterFC = 2.0, geneFC = 1.5",
                     "description": "R arguments for getAlternativePromoters() (thresholds for alternative promoters)."
                 }
-            }
+            },
+            "description": "Promoters from transcript 5' ends (--promoter_method tss, default) or junction-based proActiv."
         },
         "te_options": {
             "title": "Transposable element options",

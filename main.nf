@@ -20,6 +20,7 @@ include { PROACTIV }                                                           f
 include { SOFTWARE_VERSIONS; MULTIQC }                                         from './modules/multiqc.nf'
 include { MAKE_DESIGN }                                                        from './modules/design.nf'
 include { APA }                                                                from './modules/apa.nf'
+include { PROMOTER_TSS }                                                       from './modules/promoter.nf'
 
 /*
  * Covariates of --design ('~ condition' or '~ cov1 + cov2 + condition'), in formula order.
@@ -211,10 +212,16 @@ workflow {
     ch_versions = ch_versions.mix(ISOSWITCH.out.versions, DESEQ2_GENE.out.versions,
                                   DESEQ2_TRANSCRIPT.out.versions, SUPPA2.out.versions)
 
-    // 7. PROMOTER ACTIVITY
-    PROACTIV(ch_extended_gtf, ch_design, ch_bams_for_cohort, ch_bais_for_cohort, reference)
+    // 7. PROMOTER USAGE: transcript 5' ends (default) or proActiv (junction-based)
+    if (params.promoter_method == 'tss') {
+        PROMOTER_TSS(ch_extended_gtf, ch_transcript_counts, BAMBU.out.gene_counts, ch_design, reference)
+        ch_promoter_versions = PROMOTER_TSS.out.versions
+    } else {
+        PROACTIV(ch_extended_gtf, ch_design, ch_bams_for_cohort, ch_bais_for_cohort, reference)
+        ch_promoter_versions = PROACTIV.out.versions
+    }
 
-    ch_versions = ch_versions.mix(PROACTIV.out.versions)
+    ch_versions = ch_versions.mix(ch_promoter_versions)
 
     // 8. SOFTWARE VERSIONS AND MULTIQC (inputs come from channels, not from the output directory)
     SOFTWARE_VERSIONS(ch_versions.collect())
