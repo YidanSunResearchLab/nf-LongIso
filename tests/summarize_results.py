@@ -101,17 +101,28 @@ def metrics(d):
         m['APA: PAS clusters'] = len(rows)
         m['APA: PAS clusters q < 0.05'] = count_sig(rows, 'pas_q_value')
     f = f'{d}/isoswitch/APA_gene_summary.csv'
-    m['APA: APA_gene_summary.csv genes'] = len(read_csv(f)) if os.path.exists(f) else '- (not written)'
+    if os.path.exists(f):   # APA inside IsoformSwitchAnalyzeR (before the methodological review)
+        m['APA: APA_gene_summary.csv genes'] = len(read_csv(f))
+    f = f'{d}/apa/apa_dexseq_results.tsv'
+    if os.path.exists(f):   # APA process (DEXSeq), results/apa/
+        rows = read_csv(f, delim='\t')
+        if rows and 'gene_qvalue' in rows[0]:
+            m['APA: PAS tested'] = len(rows)
+            m['APA: genes q < 0.05'] = len({r['gene_id'] for r in rows
+                                            if (q := to_float(r['gene_qvalue'])) is not None and q < 0.05})
+        m['APA: PAS clusters'] = n_lines(f'{d}/apa/pas_annotation.tsv') - 1
     for name in ('atss_results.csv', 'atts_results.csv', 'all_AS_events.csv'):
         f = f'{d}/isoswitch/{name}'
         m[f'isoswitch: {name} rows'] = n_lines(f) - 1 if os.path.exists(f) else '-'
 
     # --- proActiv -----------------------------------------------------------
-    f = f'{d}/proactiv/promoter_counts.tsv'
-    if os.path.exists(f):
-        m['proactiv: promoters'] = n_lines(f) - 1
-    f = f'{d}/proactiv/alternative_promoters.tsv'
-    m['proactiv: alternative promoters'] = n_lines(f) - 1 if os.path.exists(f) else '- (not written)'
+    # results/proactiv/ (before the review) or results/promoter/ (both promoter methods)
+    for sub in ('proactiv', 'promoter'):
+        f = f'{d}/{sub}/promoter_counts.tsv'
+        if os.path.exists(f):
+            m['promoters'] = n_lines(f) - 1
+            f = f'{d}/{sub}/alternative_promoters.tsv'
+            m['alternative promoters'] = n_lines(f) - 1 if os.path.exists(f) else '- (not written)'
 
     # --- SUPPA2 ---------------------------------------------------------------
     tot_cells = nan_cells = 0

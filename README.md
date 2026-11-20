@@ -261,7 +261,7 @@ Splice junctions are extracted from every sample's primary alignments (`samtools
 
 📍 **Alternative polyadenylation (APA)**
 
-`apa/` replaces the v0.1.0 APA output of IsoformSwitchAnalyzeR (`isoswitch/APA_gene_summary.csv`, `clustered_base_level_PAS_usage.csv`, which used scaled isoform fractions and a Fisher test without replicates).
+`apa/` replaces the v0.1.0 APA output of IsoformSwitchAnalyzeR (`isoswitch/APA_gene_summary.csv`, `clustered_base_level_PAS_usage.csv`, which tested condition-mean pseudo-counts with a Fisher test that ignored replicates).
 
 1. **PAS sites.** The 3' ends of the Bambu transcripts are clustered per gene and strand: ends closer than `--apa_cluster_window` (25 bp) join a cluster, and clusters are split so that no cluster is wider than `--apa_max_cluster_width` (50 bp).
 2. **Internal priming.** The 3' end of a novel transcript is flagged when the 20 nt downstream are ≥ `--apa_ip_a_frac` (0.7) A or contain a run of 6 A, unless an annotated 3' end lies within 50 bp or a poly(A) signal hexamer (AATAAA, ATTAAA and 10 variants) lies 10–40 nt upstream. Flagged ends are removed (`--apa_internal_priming filter`, default) or kept and marked (`flag`). Annotated ends are never removed.

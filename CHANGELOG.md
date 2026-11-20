@@ -1,8 +1,9 @@
 # Changelog
 
 All notable changes to NextLongIso (nf-LongIso) are documented here.
-Issue numbers refer to the v0.2.0 review list (issues 1-22); changes without a number were found
-during the work on v0.2.0.
+Issue numbers refer to the v0.2.0 review list (issues 1-22). A1-A4, B1-B5 and C refer to the
+methodological review of v0.2.0 (`docs/dev/review_v0.2.0_verification.md`); changes without a label
+were found during the work on v0.2.0.
 
 ## [0.2.0] - 2026-11-20
 
@@ -33,8 +34,20 @@ during the work on v0.2.0.
 - With more than two conditions, DESeq2 results are written per comparison
   (`DE_results_<condition>_vs_<reference>.csv`, `DE_TE_<type>_results_<condition>_vs_<reference>.csv`)
   against `--reference_condition` (issue 7).
-- `APA_gene_summary.csv` and `clustered_base_level_PAS_usage.csv` have `condition_1`/`condition_2` columns
-  (one block per comparison); the summary also reports the cluster ID/coordinate and p-value (issue 8).
+- **APA moved to `results/apa/`** and is now a sample-level DEXSeq test (A2): `isoswitch/APA_gene_summary.csv`
+  and `isoswitch/clustered_base_level_PAS_usage.csv` are replaced by `apa/pas_transcripts.tsv`,
+  `pas_annotation.tsv`, `pas_counts.tsv`, `apa_dexseq_results.tsv` and a new `apa/APA_gene_summary.csv`
+  (gene q-value, top PAS, PAS shift and direction). PAS clusters are bounded (25 bp window, 50 bp maximal
+  width), and novel 3' ends that look like internal priming are removed by default
+  (`--apa_internal_priming filter`). `--seed` is removed (no simulated p-values any more).
+- **Promoter usage defaults to `--promoter_method tss`** and is written to `results/promoter/` (replaces
+  `results/proactiv/`) (A4): promoters are clusters of Bambu transcript 5' ends (single-exon transcripts
+  included), with proActiv-style activity and classes and a DEXSeq usage test. proActiv is still
+  available with `--promoter_method proactiv` (same output folder).
+- **Junction files changed** (A1): `junctions/<sample>.junctions.bed` now uses the transcript strand
+  (minimap2 `ts` tag, or `XS`) instead of the read orientation, counts primary alignments only, and has the
+  read count as score (capped at 1,000); a new `junctions/<sample>.junctions.tsv` adds motif and
+  annotation status.
 - Nextflow **≥ 25.10.0** is required (nf-schema plugin 2.7.3) (issue 20).
 - The test data are no longer part of the repository; `-profile test` downloads them from Zenodo (issue 21).
 
@@ -56,7 +69,7 @@ during the work on v0.2.0.
 - Tool arguments: `--minimap2_preset`, `--minimap2_args`, `--minimap2_junc_bed`, `--bamcoverage_args`,
   `--bambu_args`, `--suppa2_events`, `--proactiv_altprom_args`, `--isoswitch_alpha`,
   `--isoswitch_dif_cutoff`; all can also be set with `ext.args` in a custom config.
-- `--proactiv_species` (issue 9) and `--seed` for the APA Fisher tests (issue 8).
+- `--proactiv_species` (issue 9).
 - TE: `--te_count_mode exon|span`, `--te_min_overlap`, `--te_strand sense|both`, `--te_autonomous_frac`
   and the new `TE/isoform_TE_annotation.tsv`: one row per isoform-TE pair with subfamily/family/class,
   overlap, strand relation, category (autonomous > TSS > PAS > internal_exonization > other_exonic),
@@ -72,6 +85,33 @@ during the work on v0.2.0.
 - `tests/te_unit/` (synthetic TE test), `tests/summarize_results.py`, `tests/compare_te_modes.py`.
 - `docs/dev/`: baseline, verification of suspected issues, v0.2.0 vs v0.1.0 comparison;
   `docs/te_count_mode_comparison.md`.
+- **Experimental design with covariates** (B5): `--design` (e.g. `'~ batch + condition'`) over samplesheet
+  columns, used by DESeq2 (genes, transcripts, TEs), IsoformSwitchAnalyzeR and the DEXSeq usage tests;
+  the design matrix is checked before alignment (confounded designs stop with the columns involved).
+- **Isoform switch consequences** (B3): transcript sequences from the Bambu annotation (`GFFREAD`,
+  gffread 0.12.7), ORF prediction and `analyzeSwitchConsequences` (intron retention, ORF similarity, NMD,
+  TSS, TTS, last exon, length, exon number) with `switch_consequences.csv`, consequence summary and
+  enrichment tables/plots and `switch_plots.pdf` (`--isoswitch_consequences`, `--isoswitch_n_plots`).
+- **SUPPA2 differential splicing** (B4): `SUPPA2_DIFFSPLICE` runs `diffSplice` (`--suppa2_diff_args`,
+  default `-m empirical -gc`) for each condition with ≥ 2 replicates vs the reference, with
+  `suppa2/diffsplice/*.dpsi/.psivec` and `suppa2_diffsplice_significant.tsv` (`--suppa2_alpha`,
+  `--suppa2_dpsi_cutoff`; `--suppa2_diff false` turns it off).
+- **Read QC** (B1): NanoPlot 1.46.2 and `seqkit stats` 2.10.1 per sample for FASTQ input
+  (`results/read_qc/`, parsed by MultiQC; `--skip_read_qc`).
+- **SQANTI3 QC** (B2, optional): `--run_sqanti3` classifies the Bambu transcripts with `sqanti3_qc.py`
+  (official image `anaconesalab/sqanti3:v6.0.1`); classification, junctions, HTML report and
+  `sqanti3_category_counts.tsv` (FSM, ISM, NIC, NNC, ... for annotated and novel transcripts);
+  `--sqanti3_args`.
+- Alternative polyadenylation (`APA` process, `results/apa/`, A2) and transcript-based promoter usage
+  (`PROMOTER_TSS`, `results/promoter/`, A4) with parameters `--apa_*`, `--promoter_method`, `--tss_*`,
+  `--promoter_min_activity`, `--promoter_min_count`, `--usage_alpha`; shared DEXSeq usage script
+  `bin/usage_dexseq.R`.
+- Junction TSV with motif and annotation, `--junction_min_mapq`, `SAMTOOLS_FAIDX` (genome index when no
+  `.fai` exists) and `GTF_INTRONS` (A1).
+- `tests/apa_unit/` (internal-priming and clustering test); `tests/summarize_results.py` reads the new
+  `apa/` and `promoter/` folders, CI stub run with `--run_sqanti3` and a design
+  covariate, `docs/dev/review_v0.2.0_verification.md`, `docs/dev/apa_method_comparison.md`,
+  `docs/dev/promoter_method_comparison.md`.
 
 ### Changed
 
@@ -87,6 +127,8 @@ during the work on v0.2.0.
 - MultiQC reads its inputs from channels (alignment statistics, DESeq2 summaries, software versions)
   instead of scanning the output directory (issue 5).
 - R code of DESeq2, TE DESeq2, IsoformSwitchAnalyzeR and proActiv moved to `bin/` scripts.
+- Inline R/awk code of all processes moved to `bin/` scripts with `--key=value` arguments parsed in base R
+  (`bin/nli_design.R` holds the shared design helpers); outputs on the test data are unchanged (C).
 - `TE_ANALYSIS` rewritten in POSIX awk (no gawk extensions such as `ARGIND`; tested with BusyBox awk). In
   the shipped container `ARGIND` happened to work, but other awks (mawk, POSIX mode) silently returned an
   empty exonization table. Junction extraction no longer uses gawk's `and()` (output unchanged)
@@ -114,10 +156,8 @@ during the work on v0.2.0.
 - No way to choose the reference condition; with more than two conditions only one comparison was
   reported (issue 7).
 - APA: `APA_gene_summary.csv` aggregated each column separately and reported the site with the *smallest*
-  |dPAU| per gene, without its coordinates; it now reports the significant site with the largest |dPAU|
-  with its cluster ID, coordinate and q-value, all from that site (on the demo data |dPAU| is now larger
-  or equal for 450/450 genes). APA is computed per comparison. Fisher tests with simulated p-values are
-  seeded (`--seed`) (issue 8).
+  |dPAU| per gene, without its coordinates; APA was computed for one comparison only (issue 8). The APA
+  analysis was then replaced as a whole (A2, below).
 - proActiv: species and alternative-promoter thresholds were hard-coded; samples were matched to
   conditions by prefix/substring (issue 9).
 - TE: a transcript overlapping several TEs kept only the last one (`data[$4]` overwrite) in
@@ -132,6 +172,25 @@ during the work on v0.2.0.
 - `significant_switches.csv` could contain all-NA rows (filter without `which()`); it now also applies
   the |dIF| cutoff.
 - SUPPA2 "PSI in ≥ 2 samples" filter ignored the last sample.
+- **Junction strand** (A1): minimap2 writes no `XS` tag, so junctions took the read orientation; on the
+  demo data 2.0 % of spliced reads and up to 25 % of a sample's junctions had a wrong or duplicated
+  strand (for unoriented cDNA reads this approaches 50 %). The strand now comes from the `ts` tag (or
+  `XS`), only primary alignments are used, and the TE junction support only accepts junctions on the
+  transcript's strand (or of unknown strand).
+- **APA statistics** (A2): the APA test used condition-level pseudo-counts (IF × gene mean) and a Fisher
+  test that ignored replicates, library size and the sample-level counts. APA now uses sample-level
+  Bambu counts per PAS cluster and DEXSeq with the design covariates (see Breaking changes). On the demo
+  data the old test called 1,041 of 1,564 clusters (450 genes) significant; the new one finds 3 genes,
+  all among the old 450 (`docs/dev/apa_method_comparison.md`).
+- **TE normalisation** (A3): TE DESeq2 estimated size factors from transcript and TE counts combined
+  (TE counts are sums of transcript counts); size factors now come from the gene-level counts alone.
+  On the demo data the H1 rep1 size factor changes from 1.31 to 1.49 and TE-family log2 fold changes
+  shift by a median of −0.12.
+- **Promoter quantification** (A4): proActiv measures promoters from first-intron junctions, so promoters
+  of single-exon transcripts were always NA (25,638 promoters in the demo annotation). The default
+  `tss` method quantifies promoters from transcript counts and includes them. (The placeholder
+  `motif`/`annotated` columns of the converted junction files are not read by proActiv, so they did not
+  affect its counts.)
 
 ## [0.1.0] - 2026-08-03
 
