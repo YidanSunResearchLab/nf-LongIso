@@ -1,8 +1,8 @@
 # Promoter usage: proActiv vs transcript-5'-end (tss) method
 
-Status: method description complete; demo numbers are filled in after the demo run of review
-phase 12 (`demo_v0.2.0_r2` with the default `--promoter_method tss`; proActiv results from
-`demo_v0.2.0`).
+Demo comparison: `demo_v0.2.0_r2` (default `--promoter_method tss`) vs the proActiv results of
+`demo_v0.2.0` (proActiv code unchanged since then apart from the move to `bin/`; the run with the
+current code was not repeated).
 
 ## Methods
 
@@ -29,7 +29,25 @@ of the same gene (internal promoters).
 
 ## Demo comparison
 
-To be completed after the demo run: promoters detected and active per method, contribution of
-single-exon transcripts, overlap of differential promoters (proActiv `alternative_promoters.tsv` vs tss
-`alternative_promoters.tsv`), and agreement with the IsoformSwitchAnalyzeR ATSS events
-(`isoswitch/atss_results.csv`).
+| | proActiv (`demo_v0.2.0/proactiv/`) | tss (`demo_v0.2.0_r2/promoter/`) |
+|---|---|---|
+| Promoters | 160,497 | 199,302 in 78,936 genes |
+| NA in all samples | 25,638 (single-exon-only promoters) | 0 |
+| Class NA (internal or unquantified) | 67,931 | 0 (120,364 internal promoters are classified and flagged) |
+| Active (Major + Minor), control / treatment | 890 / 1,208 | 2,591 / 3,241 |
+| Active promoters made only of single-exon transcripts | 0 (always NA) | 112 |
+| Differential usage | no alternative promoters (`getAlternativePromoters`) | 72 promoters in 35 genes tested; **3 genes** with gene q < 0.05 |
+
+The three genes with differential promoter usage (ENSG00000144381 HSPD1, ENSG00000188846 RPL14,
+ENSG00000169764 UGP2) all have an IsoformSwitchAnalyzeR ATSS event (842 genes with ATSS events).
+RPL14 is also one of the three significant APA genes.
+
+### Notes on the proActiv input
+
+`bin/run_proactiv.R` writes STAR `SJ.out.tab` files with constant `motif` and `annotated` columns.
+proActiv reads them with `GenomicAlignments::readSTARJunctions()` and counts, per intron, the unique
+reads of the junction with exactly the same coordinates and a compatible strand; the `motif` and
+`annotated` columns are not used, so the placeholders do not change its counts. The junctions come
+from `summarizeJunctions()` without a genome and therefore have strand `*`, which matches introns on
+either strand; this only matters for identical intron coordinates on both strands. Feeding proActiv
+the stranded junction tables of `EXTRACT_JUNCTIONS` would remove this; it is not done in v0.2.0.

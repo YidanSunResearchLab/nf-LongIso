@@ -1,7 +1,7 @@
 # APA: old method (v0.2.0 draft, Fisher) vs new method (DEXSeq)
 
-Status: method description complete; demo numbers are filled in after the demo run of review
-phase 12 (`demo_v0.2.0_r2`), compared with `demo_v0.2.0` (old method).
+Demo comparison: `demo_v0.2.0` (old method) vs `demo_v0.2.0_r2` (new method), both on the bundled demo
+(GM12878 ×2 = control, H1 ×2 = treatment, 10,000 reads per sample, GRCh38 / GENCODE).
 
 ## Methods
 
@@ -29,9 +29,25 @@ batch covariate.
 
 ## Demo comparison
 
-To be completed after the demo run (review phase 12): PAS clusters, genes tested, significant genes
-(old: PAS-cluster q < 0.05 in `clustered_base_level_PAS_usage.csv` / genes in `APA_gene_summary.csv`;
-new: gene q < 0.05), overlap, and the number of 3' ends removed by the internal-priming filter.
+| | Old (`demo_v0.2.0/isoswitch/`) | New (`demo_v0.2.0_r2/apa/`) |
+|---|---|---|
+| Transcript 3' ends | from switch-analysis isoforms only | 388,075 (131 novel) |
+| Ends flagged as internal priming | - | 0 (1 A-rich novel end, rescued by a PAS signal / nearby annotated end) |
+| PAS clusters | 1,564 in 874 genes (expressed isoforms of tested genes) | 234,252 in 78,936 genes |
+| Tested | 1,564 clusters | 75 PAS in 37 genes (≥ 10 reads, ≥ 2 PAS per gene) |
+| Significant | 1,041 clusters (q < 0.05) in 450 genes | 6 PAS (padj < 0.05); **3 genes** (gene q < 0.05) |
+| Gene summary | 450 genes | 37 genes, 3 significant (2 distal, 1 proximal shift) |
+
+The three significant genes (ENSG00000188846 RPL14, PAS shift +5.3 kb distal, dPAU −0.85;
+ENSG00000132780 NASP, +448 bp distal; ENSG00000164587 RPS14, −305 bp proximal) are all among the 450
+old genes. 28 of the 450 old genes reach the new test (the others have < 10 reads per PAS or a
+single PAS with reads); none of the other 25 is significant.
+
+The old method called 58 % of its tested clusters significant with 2 × 10,000 reads per condition: the
+Fisher test treated condition-mean pseudo-counts as independent reads, so any usage difference in a
+moderately expressed gene became "significant" regardless of replicate agreement. With DEXSeq the
+replicate variability enters the test, and only consistent shifts remain. The demo is too shallow
+for the new test to have much power; the numbers show the change in calibration, not sensitivity.
 
 Pre-run figures on the demo Bambu annotation (`demo_v0.2.0/bambu`, `apa_sites.R` only): 388,075
 transcript 3' ends (131 novel); 1 novel end with an A-rich downstream sequence, rescued by an
