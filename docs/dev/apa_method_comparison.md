@@ -9,7 +9,7 @@ Demo comparison: `demo_v0.2.0` (old method) vs `demo_v0.2.0_r2` (new method), bo
 |---|---|---|
 | PAS of a transcript | 3' end of its last exon | same (strand-aware) |
 | Clustering | ±12.5 bp resize + `reduce()` over all transcripts (no width limit; single linkage can chain sites) | per gene and strand, window `--apa_cluster_window` (25 bp), maximal width `--apa_max_cluster_width` (50 bp) |
-| Internal priming | not considered | novel 3' ends with ≥ `--apa_ip_a_frac` (0.7) A or a run of ≥ 6 A in the 20 nt downstream, unless an annotated 3' end is ≤ 50 bp away or a poly(A) signal lies 10-40 nt upstream; `--apa_internal_priming filter` (default) or `flag` |
+| Internal priming | not considered | novel 3' ends with ≥ `--apa_ip_a_frac` (0.7) A or a run of ≥ 6 A in the 20 nt downstream, unless an annotated 3' end is ≤ 50 bp away or AATAAA/ATTAAA lies 10-35 nt upstream (weaker hexamer variants do not rescue); novel = transcript ID not in `--gtf`; `--apa_internal_priming filter` (default) or `flag` |
 | Counts | condition-level pseudo-counts IF × gene_value (isoformFeatures) | sample-level Bambu transcript counts summed per PAS cluster |
 | Test | Fisher's exact test with simulated p-values on the rounded pseudo-counts, BH per comparison | DEXSeq per comparison (`~ sample + exon + <covariates>:exon + condition:exon`), PAS-level padj and gene-level q (perGeneQValue) |
 | Replicates | not used | required (≥ 2 per condition), dispersion estimated from them |
@@ -19,15 +19,21 @@ Demo comparison: `demo_v0.2.0` (old method) vs `demo_v0.2.0_r2` (new method), bo
 
 ## Synthetic checks (tests/apa_unit)
 
-Internal-priming rules on a synthetic contig: an A-rich novel end without exception is flagged and
-removed (`filter`) or marked (`flag`); A-rich novel ends with a poly(A) signal 25 nt upstream or an
-annotated end 30 bp away are kept; annotated ends are never flagged.
+Internal-priming rules on a synthetic contig, on both strands: an A-rich novel end without exception is
+flagged and removed (`filter`) or marked (`flag`); A-rich novel ends with AATAAA 15-25 nt upstream or an
+annotated end 30 bp away are kept; an A-rich novel end with only the weak variant AAGAAA upstream is
+flagged; annotated ends are never flagged.
 
 DEXSeq usage test (`bin/usage_dexseq.R`) on 60 simulated genes with 2 sites, 3 vs 3 replicates and a
 usage shift (0.5 -> 0.85) in 6 genes: exactly the 6 shifted genes have q < 0.05, with and without a
 batch covariate.
 
 ## Demo comparison
+
+The figures below come from `demo_v0.2.0_r2`, run before two later changes: the rescue by a poly(A)
+signal now requires AATAAA or ATTAAA 10-35 nt upstream (any of 12 hexamers 10-40 nt before), and novel
+transcripts are recognised by the transcript IDs of `--gtf` instead of the `BambuTx` prefix (same result
+on the demo). The internal-priming figures will be updated after the next demo run.
 
 | | Old (`demo_v0.2.0/isoswitch/`) | New (`demo_v0.2.0_r2/apa/`) |
 |---|---|---|
