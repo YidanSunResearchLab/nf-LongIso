@@ -1,12 +1,12 @@
 /*
- * Promoter usage from transcript 5' ends (--promoter_method tss, default).
+ * Promoter usage from transcript 5' ends (--promoter_method tss, optional; results/promoter_tss/).
  * R code: bin/tss_sites.R (promoters, counts, activity), bin/usage_dexseq.R (differential usage)
- * The alternative proActiv implementation is in modules/proactiv.nf (--promoter_method proactiv).
+ * The default proActiv implementation is in modules/proactiv.nf (--promoter_method proactiv).
  */
 
 process PROMOTER_TSS {
     tag "promoter_tss"
-    publishDir "${params.outdir}/promoter", mode: params.publish_dir_mode, pattern: "*.tsv"
+    publishDir "${params.outdir}/promoter_tss", mode: params.publish_dir_mode, pattern: "*.tsv"
 
     input:
     path iso_gtf        // Bambu extended_annotations.gtf
@@ -14,6 +14,7 @@ process PROMOTER_TSS {
     path gene_counts    // Bambu counts_gene.txt (size factors)
     path design
     val  reference
+    path ref_ids        // transcript IDs of the reference annotation (GTF_INTRONS)
 
     output:
     path "promoter_annotation.tsv"     , emit: annotation
@@ -35,6 +36,7 @@ process PROMOTER_TSS {
         --exons=transcript_exons.tsv \\
         --counts=${counts} \\
         --gene-counts=${gene_counts} \\
+        --ref-ids=${ref_ids} \\
         --design=${design} \\
         --design-formula='${params.design}' \\
         --reference=${reference} \\

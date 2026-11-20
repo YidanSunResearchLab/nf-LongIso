@@ -10,6 +10,7 @@
 #   --exons    TSV without header: transcript_id, gene_id, chr, start, end, strand (Bambu extended
 #              annotation exons, 1-based)
 #   --counts   Bambu counts_transcript.txt; --gene-counts Bambu counts_gene.txt (size factors)
+#   --ref-ids  transcript IDs of the reference annotation (one per line); other transcripts are novel
 #
 # Method
 #   * TSS of a transcript = its 5' end (strand-aware); single-exon transcripts are included.
@@ -20,6 +21,9 @@
 #   * Relative activity = promoter count / gene count (sum of the gene's promoter counts).
 #   * Class per condition (proActiv rules): mean absolute activity < --min-activity -> Inactive; the
 #     most active promoter of the gene -> Major; other active promoters -> Minor.
+#   * Internal promoter: the TSS lies in a non-first exon (in transcription order) of another transcript
+#     of the same gene, i.e. inside an exon that is not where that transcript starts (the idea of
+#     proActiv's internal promoters, which proActiv defines by intron ranks).
 #
 # Outputs
 #   promoter_annotation.tsv  promoter_id, gene_id, chr, strand, start, end, tss_coord, transcripts,
@@ -34,7 +38,7 @@ suppressPackageStartupMessages(library(DESeq2))
 source(file.path(dirname(normalizePath(.script)), "nli_design.R"))
 source(file.path(dirname(normalizePath(.script)), "nli_clusters.R"))
 opt <- parse_args(commandArgs(trailingOnly = TRUE))
-for (k in c("exons", "counts", "gene-counts", "design", "design-formula", "reference", "window", "max-width", "min-activity")) {
+for (k in c("exons", "counts", "gene-counts", "ref-ids", "design", "design-formula", "reference", "window", "max-width", "min-activity")) {
     if (is.null(opt[[k]])) stop(sprintf("Missing required argument --%s", k))
 }
 window <- as.numeric(opt$window); max_width <- as.numeric(opt[["max-width"]]); min_act <- as.numeric(opt[["min-activity"]])
@@ -49,9 +53,12 @@ min_start <- tapply(ex$start, ex$transcript_id, min); max_end <- tapply(ex$end, 
 tx$tss <- ifelse(tx$strand == "+", min_start[tx$transcript_id], max_end[tx$transcript_id])
 tx$tes <- ifelse(tx$strand == "+", max_end[tx$transcript_id], min_start[tx$transcript_id])
 tx$n_exons <- as.integer(table(ex$transcript_id)[tx$transcript_id])
-tx$annotated <- !startsWith(tx$transcript_id, "BambuTx")
+# Annotated = transcript ID of the reference annotation (independent of Bambu's novel-transcript prefix)
+ref_ids <- readLines(opt[["ref-ids"]])
+tx$annotated <- tx$transcript_id %in% ref_ids
+message(sprintf("Transcripts: %d (%d annotated, %d novel)", nrow(tx), sum(tx$annotated), sum(!tx$annotated)))
 
-design <- read.csv(opt$design, stringsAsFactors = FALSE)
+design <- read_design(opt$design)
 counts <- read.delim(opt$counts, check.names = FALSE, stringsAsFactors = FALSE)
 colnames(counts) <- strip_suffix(colnames(counts))
 cmat <- as.matrix(counts[, design$sample, drop = FALSE]); rownames(cmat) <- counts$TXNAME
@@ -76,19 +83,21 @@ ann <- data.frame(
     stringsAsFactors = FALSE)
 ann$key <- key[first]
 
-# Internal promoter: the TSS lies inside the body of another transcript of the same gene that
-# starts further upstream (in transcription direction)
-s <- ifelse(tx$strand == "+", 1, -1)
-body_from <- s * tx$tss; body_to <- s * tx$tes        # transcription-oriented coordinates
+# Internal promoter: the TSS lies in a non-first exon (transcription order) of another transcript of the
+# same gene and strand. Exons of other promoters' transcripts that are not their first exon:
+suppressPackageStartupMessages(library(GenomicRanges))
+ex <- ex[ex$transcript_id %in% tx$transcript_id, ]
+ex_first <- ifelse(ex$strand == "+", ex$start == min_start[ex$transcript_id], ex$end == max_end[ex$transcript_id])
+nf <- ex[!ex_first, ]
+nf$promoter_id <- tx$promoter_id[match(nf$transcript_id, tx$transcript_id)]
 ann$internal_promoter <- "no"
-by_gene <- split(seq_len(nrow(tx)), tx$gene_id)
-gene_idx <- match(ann$gene_id, names(by_gene))      # positional lookup (named-list lookup is linear)
-for (i in seq_len(nrow(ann))) {
-    j <- by_gene[[gene_idx[i]]]
-    j <- j[tx$strand[j] == ann$strand[i] & tx$promoter_id[j] != ann$promoter_id[i]]
-    if (length(j) == 0) next
-    p <- ifelse(ann$strand[i] == "+", 1, -1) * ann$tss_coord[i]
-    if (any(body_from[j] < p & body_to[j] > p)) ann$internal_promoter[i] <- "yes"
+if (nrow(nf) > 0) {
+    q  <- GRanges(ann$chr, IRanges(ann$tss_coord, width = 1), strand = ann$strand)
+    sb <- GRanges(nf$chr, IRanges(nf$start, nf$end), strand = nf$strand)
+    hits <- findOverlaps(q, sb)
+    same_gene <- ann$gene_id[queryHits(hits)] == nf$gene_id[subjectHits(hits)] &
+                 ann$promoter_id[queryHits(hits)] != nf$promoter_id[subjectHits(hits)]
+    ann$internal_promoter[unique(queryHits(hits)[same_gene])] <- "yes"
 }
 
 # Distance to the nearest annotated TSS (same chromosome and strand)

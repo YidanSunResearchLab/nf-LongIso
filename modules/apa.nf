@@ -14,6 +14,7 @@ process APA {
     val  reference
     path fasta
     path fai
+    path ref_ids        // transcript IDs of the reference annotation (GTF_INTRONS)
 
     output:
     path "pas_annotation.tsv"     , emit: annotation
@@ -35,6 +36,7 @@ process APA {
         --exons=transcript_exons.tsv \\
         --counts=${counts} \\
         --genome=${fasta} \\
+        --ref-ids=${ref_ids} \\
         --design=${design} \\
         --window=${params.apa_cluster_window} \\
         --max-width=${params.apa_max_cluster_width} \\

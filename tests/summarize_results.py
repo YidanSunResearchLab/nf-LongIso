@@ -116,8 +116,8 @@ def metrics(d):
         m[f'isoswitch: {name} rows'] = n_lines(f) - 1 if os.path.exists(f) else '-'
 
     # --- proActiv -----------------------------------------------------------
-    # results/proactiv/ (before the review) or results/promoter/ (both promoter methods)
-    for sub in ('proactiv', 'promoter'):
+    # results/proactiv/ (proActiv) or results/promoter_tss/ (--promoter_method tss; results/promoter/ in development builds)
+    for sub in ('proactiv', 'promoter', 'promoter_tss'):
         f = f'{d}/{sub}/promoter_counts.tsv'
         if os.path.exists(f):
             m['promoters'] = n_lines(f) - 1

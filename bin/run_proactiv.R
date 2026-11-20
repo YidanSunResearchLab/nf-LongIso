@@ -5,8 +5,11 @@
 #   run_proactiv.R --gtf=cleaned_annotations.gtf --design=design.csv --species=Homo_sapiens \
 #              --reference=control --altprom-args-file=altprom_args.txt --cpus=8
 #
-# BAM files (<sample>.sorted.bam) are read from the working directory. Junctions are
-# converted to STAR SJ.out.tab format, which proActiv accepts as input.
+# Junction tables (<sample>.junctions.tsv from EXTRACT_JUNCTIONS: chr, start (0-based), end, strand,
+# reads, motif, annotated) are read from the working directory and converted to STAR SJ.out.tab files,
+# which proActiv accepts as input. The strand comes from the minimap2 ts tag (+ -> 1, - -> 2);
+# junctions of unknown strand ('.') are not used: proActiv counts a junction for the intron with the
+# same coordinates on the strand given in the file, and STAR's code 0 would be read as '+'.
 # --altprom-args-file contains extra R arguments for getAlternativePromoters(), e.g.
 #   minAbs = 0.25, minRel = 0.05, maxPval = 0.05, promoterFC = 2.0, geneFC = 1.5
 #
@@ -15,7 +18,6 @@
 suppressPackageStartupMessages({
     library(proActiv)
     library(GenomicFeatures)
-    library(GenomicAlignments)
     library(SummarizedExperiment)
 })
 
@@ -32,44 +34,52 @@ message("Preparing promoter annotation (species: ", opt$species, ")...")
 txdb           <- makeTxDbFromGFF(opt$gtf)
 promoter_annot <- preparePromoterAnnotation(txdb = txdb, species = opt$species)
 
-# ---- 2. Junctions from BAM files -----------------------------------------------------------------
-bam_files <- sort(list.files(pattern = "[.]sorted[.]bam$"))
-message(sprintf("Found %d BAM files", length(bam_files)))
+# ---- 2. Junction tables -> STAR SJ.out.tab ----------------------------------------------------------
+# STAR intron motif codes (genome orientation): 0 non-canonical, 1 GT/AG, 2 CT/AC, 3 GC/AG, 4 CT/GC,
+# 5 AT/AC, 6 GT/AT. The junction tables give the motif in transcript orientation, so a minus-strand
+# GT-AG junction is code 2, etc.
+motif_code <- function(motif, strand) {
+    base <- c("GT-AG" = 1L, "GC-AG" = 3L, "AT-AC" = 5L)[motif]
+    ifelse(is.na(base), 0L, base + as.integer(strand == "-"))
+}
+tsv_files <- sort(list.files(pattern = "[.]junctions[.]tsv$"))
+message(sprintf("Found %d junction tables", length(tsv_files)))
 junc_files   <- character(0)
 sample_names <- character(0)
-for (bam_file in bam_files) {
-    sname <- sub("[.]sorted[.]bam$", "", bam_file)
-    gal   <- readGAlignments(bam_file, param = ScanBamParam(
-                 flag = scanBamFlag(isSecondaryAlignment = FALSE, isUnmappedQuery = FALSE)))
-    juncs <- summarizeJunctions(gal)
-    if (length(juncs) == 0) {
-        warning(sprintf("No junctions found in %s - sample skipped", bam_file))
+for (tsv in tsv_files) {
+    sname <- sub("[.]junctions[.]tsv$", "", tsv)
+    j <- read.delim(tsv, colClasses = c(chr = "character", strand = "character", motif = "character",
+                                        annotated = "character"), na.strings = character(0))
+    unstranded <- j$strand == "."
+    j <- j[!unstranded, , drop = FALSE]
+    if (nrow(j) == 0) {
+        warning(sprintf("No stranded junctions in %s - sample skipped", tsv))
         next
     }
-    df <- as.data.frame(juncs)
     star_df <- data.frame(
-        chrom     = as.character(df$seqnames),
-        start     = df$start,
-        end       = df$end,
-        strand    = ifelse(as.character(df$strand) == "+", 1L, ifelse(as.character(df$strand) == "-", 2L, 0L)),
-        motif     = 1L,
-        annotated = 1L,
-        unique    = pmax(as.integer(df$score), 1L),
+        chrom     = j$chr,
+        start     = j$start + 1L,                       # first intron base, 1-based
+        end       = j$end,                              # last intron base, 1-based
+        strand    = ifelse(j$strand == "+", 1L, 2L),
+        motif     = motif_code(j$motif, j$strand),
+        annotated = as.integer(j$annotated == "yes"),
+        unique    = as.integer(j$reads),
         multi     = 0L,
-        overhang  = 10L
+        overhang  = 10L                                 # not used by proActiv
     )
     out_name <- paste0(sname, ".SJ.out.tab")
     write.table(star_df, out_name, sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
     junc_files   <- c(junc_files, out_name)
     sample_names <- c(sample_names, sname)
-    message(sprintf("  %s: %d junctions", sname, nrow(star_df)))
+    message(sprintf("  %s: %d junctions (+: %d, -: %d; %d of unknown strand not used)", sname, nrow(star_df),
+                    sum(star_df$strand == 1L), sum(star_df$strand == 2L), sum(unstranded)))
 }
 if (length(junc_files) == 0) stop("No junction files created - aborting.")
 
 # ---- 3. Sample -> condition (exact sample names from the validated samplesheet) ---------------
-design <- read.csv(opt$design, stringsAsFactors = FALSE)
+design <- read_design(opt$design)
 unknown <- setdiff(sample_names, design$sample)
-if (length(unknown) > 0) stop(sprintf("BAM files without a samplesheet entry: %s", paste(unknown, collapse = ", ")))
+if (length(unknown) > 0) stop(sprintf("Junction tables without a samplesheet entry: %s", paste(unknown, collapse = ", ")))
 conditions <- design$condition[match(sample_names, design$sample)]
 print(data.frame(Sample = sample_names, Condition = conditions))
 

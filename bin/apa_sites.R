@@ -3,21 +3,25 @@
 #
 # Usage:
 #   apa_sites.R --exons=transcript_exons.tsv --counts=counts_transcript.txt --genome=genome.fa \
-#               --design=design.csv --window=25 --max-width=50 --ip-a-frac=0.7 --ip-mode=filter
+#               --ref-ids=reference_transcripts.txt --design=design.csv --window=25 --max-width=50 \
+#               --ip-a-frac=0.7 --ip-mode=filter
 #
 # Inputs
 #   --exons    TSV without header: transcript_id, gene_id, chr, start, end, strand (exons of the
 #              Bambu extended annotation, 1-based)
 #   --counts   Bambu counts_transcript.txt (TXNAME, GENEID, samples...)
 #   --genome   genome FASTA with a .fai index next to it
+#   --ref-ids  transcript IDs of the reference annotation (one per line); other transcripts are novel
 #
 # Method
-#   * PAS of a transcript = its 3' end (strand-aware). Transcripts whose ID does not start with
-#     'BambuTx' come from the reference annotation ('annotated' ends).
+#   * PAS of a transcript = its 3' end (strand-aware). Transcripts whose ID is in --ref-ids come from
+#     the reference annotation ('annotated' ends); all others are novel.
 #   * Internal priming (novel transcripts only): the 20 nt downstream of the 3' end contain
 #     >= --ip-a-frac A or a run of >= 6 A, unless an annotated 3' end lies within 50 bp (same strand)
-#     or a poly(A) signal hexamer occurs 10-40 nt upstream. --ip-mode filter removes such ends before
-#     clustering; --ip-mode flag keeps them and marks the cluster.
+#     or one of the two strong poly(A) signals AATAAA / ATTAAA occurs 10-35 nt upstream. Weaker
+#     hexamer variants (reported in pas_signal, 10-40 nt) do not rescue an end: several are A-rich and
+#     occur by chance in genomic A-tracts. --ip-mode filter removes such ends before clustering;
+#     --ip-mode flag keeps them and marks the cluster.
 #   * Ends are clustered per gene and strand (window --window, maximal width --max-width).
 #   * PAS counts = sum of the Bambu read counts of the transcripts in each cluster, per sample.
 #
@@ -45,6 +49,7 @@ ip_mode   <- opt[["ip-mode"]]
 if (!ip_mode %in% c("filter", "flag")) stop("--ip-mode must be 'filter' or 'flag'")
 PAS_SIGNALS <- c("AATAAA", "ATTAAA", "AGTAAA", "TATAAA", "CATAAA", "GATAAA",
                  "AATATA", "AATACA", "AATAGA", "AAAAAG", "ACTAAA", "AAGAAA")
+STRONG_SIGNALS <- c("AATAAA", "ATTAAA")   # the only hexamers that rescue an A-rich novel 3' end
 strip_suffix <- function(x) sub("[.]sorted([.]bam)?$", "", x)
 
 # ---- 1. Transcript 3' ends ---------------------------------------------------------------------
@@ -55,11 +60,12 @@ ends <- ex[!duplicated(ex$transcript_id), c("transcript_id", "gene_id", "chr", "
 max_end <- tapply(ex$end, ex$transcript_id, max)
 min_start <- tapply(ex$start, ex$transcript_id, min)
 ends$pos <- ifelse(ends$strand == "+", max_end[ends$transcript_id], min_start[ends$transcript_id])
-ends$annotated <- !startsWith(ends$transcript_id, "BambuTx")
+# Annotated = transcript ID of the reference annotation (independent of Bambu's novel-transcript prefix)
+ends$annotated <- ends$transcript_id %in% readLines(opt[["ref-ids"]])
 
 counts <- read.delim(opt$counts, check.names = FALSE, stringsAsFactors = FALSE)
 colnames(counts) <- strip_suffix(colnames(counts))
-design <- read.csv(opt$design, stringsAsFactors = FALSE)
+design <- read_design(opt$design)
 cmat <- as.matrix(counts[, design$sample, drop = FALSE]); rownames(cmat) <- counts$TXNAME
 ends$reads <- rowSums(cmat)[ends$transcript_id]; ends$reads[is.na(ends$reads)] <- 0
 
@@ -82,6 +88,9 @@ up   <- get_seq(ends$chr, ifelse(plus, ends$pos - 40, ends$pos + 10), ifelse(plu
 ends$downstream_A_frac <- ifelse(nchar(down) > 0, nchar(gsub("[^A]", "", down)) / nchar(down), NA)
 ends$downstream_A6     <- grepl("AAAAAA", down)
 ends$pas_signal <- vapply(up, function(s) { h <- PAS_SIGNALS[vapply(PAS_SIGNALS, grepl, logical(1), x = s, fixed = TRUE)]; if (length(h)) h[1] else NA_character_ }, character(1))
+# Strong signal 10-35 nt upstream (the window that rescues an A-rich novel end)
+up35 <- get_seq(ends$chr, ifelse(plus, ends$pos - 35, ends$pos + 10), ifelse(plus, ends$pos - 10, ends$pos + 35), ends$strand)
+ends$strong_pas_signal <- grepl(STRONG_SIGNALS[1], up35, fixed = TRUE) | grepl(STRONG_SIGNALS[2], up35, fixed = TRUE)
 
 ann <- ends[ends$annotated, c("chr", "strand", "pos")]
 near_annotated <- rep(FALSE, nrow(ends))
@@ -91,7 +100,7 @@ if (nrow(ann) > 0) {
     near_annotated <- overlapsAny(q, s, maxgap = 50)
 }
 a_rich <- (!is.na(ends$downstream_A_frac) & ends$downstream_A_frac >= a_frac) | ends$downstream_A6
-ends$internal_priming <- !ends$annotated & a_rich & !near_annotated & is.na(ends$pas_signal)
+ends$internal_priming <- !ends$annotated & a_rich & !near_annotated & !ends$strong_pas_signal
 message(sprintf("3' ends: %d (%d novel); novel ends with A-rich downstream sequence: %d; flagged as internal priming: %d",
                 nrow(ends), sum(!ends$annotated), sum(!ends$annotated & a_rich), sum(ends$internal_priming)))
 
@@ -121,7 +130,8 @@ ann_tab <- ann_tab[order(ann_tab$chr, ann_tab$start, ann_tab$gene_id, ann_tab$pa
 write.table(ann_tab, "pas_annotation.tsv", sep = "\t", quote = FALSE, row.names = FALSE, na = "NA")
 
 out_ends <- ends[order(ends$gene_id, ends$transcript_id), c("transcript_id", "gene_id", "chr", "strand", "pos",
-    "annotated", "reads", "downstream_A_frac", "downstream_A6", "pas_signal", "internal_priming", "used", "pas_id")]
+    "annotated", "reads", "downstream_A_frac", "downstream_A6", "pas_signal", "strong_pas_signal", "internal_priming",
+    "used", "pas_id")]
 write.table(out_ends, "pas_transcripts.tsv", sep = "\t", quote = FALSE, row.names = FALSE, na = "NA")
 
 # ---- 4. PAS x sample counts -------------------------------------------------------------------------

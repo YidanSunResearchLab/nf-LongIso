@@ -75,6 +75,18 @@ awk 'BEGIN { FS = OFS = "\t" } NR == 1 { for (i = 1; i <= NF; i++) sub(/[.]sorte
 SAMPLES=$(head -n 1 counts.tsv | cut -f3-)
 NS=$(head -n 1 counts.tsv | awk -F '\t' '{ print NF - 2 }')
 
+# Chromosome names shared by the TE GTF and the isoform GTF: none usually means a naming mismatch
+# ('chr1' vs '1'), which would silently give empty TE tables
+SHARED_CHR=$(awk -F '\t' '!/^#/ && NF >= 8 { print $1 }' "$TE_GTF" | sort -u > te_chr.txt
+             awk -F '\t' '!/^#/ && NF >= 8 { print $1 }' "$ISO_GTF" | sort -u > iso_chr.txt
+             comm -12 te_chr.txt iso_chr.txt | wc -l)
+echo "Chromosomes: $(wc -l < te_chr.txt) in the TE GTF, $(wc -l < iso_chr.txt) in the isoform GTF, $SHARED_CHR shared"
+if [ "$SHARED_CHR" -eq 0 ]; then
+    echo "WARNING: the TE GTF and the isoform GTF have no chromosome name in common" \
+         "(TE GTF: $(head -n 3 te_chr.txt | tr '\n' ' ')...; isoform GTF: $(head -n 3 iso_chr.txt | tr '\n' ' ')...)." \
+         "All TE counts will be 0; use a TE GTF with the same chromosome names as --genome and --gtf." >&2
+fi
+
 # Reference exons (annotated exonic space)
 awk -F '\t' -v OFS='\t' '$3 == "exon" && NF >= 8 && $4 >= 1 && $5 > $4 && $7 != "" { print $1, $4 - 1, $5, ".", ".", $7 }' \
     "$REF_GTF" > ref_exons_raw.bed

@@ -124,7 +124,7 @@ workflow {
           SUPPA2 diffSplice   : ${!params.suppa2_diff ? 'off' : diff_conditions ? "${diff_conditions.join(', ')} vs ${reference}; ${params.suppa2_diff_args}" : 'skipped (needs >= 2 replicates in the reference and another condition)'}
           Read QC             : ${params.input_type != 'fastq' ? 'not run (BAM input)' : params.skip_read_qc ? 'skipped (--skip_read_qc)' : 'NanoPlot, seqkit stats'}
           SQANTI3 QC          : ${params.run_sqanti3 ? 'on' + (params.sqanti3_args ? " (${params.sqanti3_args})" : '') : 'off (--run_sqanti3 to enable)'}
-          proActiv            : species=${params.proactiv_species}; ${params.proactiv_altprom_args}
+          Promoter usage      : ${params.promoter_method == 'proactiv' ? "proActiv (species=${params.proactiv_species}; ${params.proactiv_altprom_args})" : "tss (5' end clusters, DEXSeq)"}
           Output directory    : ${params.outdir}
         """.stripIndent()
     ch_input = channel.fromList(samples)
@@ -183,6 +183,8 @@ workflow {
     EXTRACT_JUNCTIONS(ch_bams_indexed, file(params.genome), ch_fai, GTF_INTRONS.out.introns)
     MAKE_BIGWIG(ch_bams_indexed)
     ch_junctions = EXTRACT_JUNCTIONS.out.junctions
+    // Stranded junction tables of all samples (proActiv input), sorted for a stable -resume hash
+    ch_junction_tables = EXTRACT_JUNCTIONS.out.tsv.map { _meta, tsv -> tsv }.collect(sort: true)
     ch_versions = ch_versions.mix(SAMTOOLS_STATS.out.versions, EXTRACT_JUNCTIONS.out.versions, MAKE_BIGWIG.out.versions,
                                   GTF_INTRONS.out.versions)
 
@@ -228,7 +230,7 @@ workflow {
     } else {
         ch_nt_fasta = channel.value([])
     }
-    ISOSWITCH(ch_transcript_counts, ch_transcript_abundance, ch_extended_gtf, ch_design, reference, ch_nt_fasta)
+    ISOSWITCH(ch_transcript_counts, ch_transcript_abundance, ch_extended_gtf, ch_design, reference, ch_nt_fasta, file(params.gtf))
     DESEQ2_GENE(BAMBU.out.gene_counts, ch_design, 'gene', reference)
     DESEQ2_TRANSCRIPT(ch_transcript_counts, ch_design, 'transcript', reference)
     SUPPA2(ch_extended_gtf, ch_transcript_counts)
@@ -246,18 +248,21 @@ workflow {
         log.warn "SUPPA2 diffSplice skipped: it needs >= 2 replicates in the reference condition (${reference}) and in at least one other condition"
     }
     // Alternative polyadenylation (DEXSeq on PAS clusters)
-    APA(ch_extended_gtf, ch_transcript_counts, ch_design, reference, file(params.genome), ch_fai)
+    APA(ch_extended_gtf, ch_transcript_counts, ch_design, reference, file(params.genome), ch_fai, GTF_INTRONS.out.tx_ids)
     ch_versions = ch_versions.mix(APA.out.versions)
 
     ch_versions = ch_versions.mix(ISOSWITCH.out.versions, DESEQ2_GENE.out.versions,
                                   DESEQ2_TRANSCRIPT.out.versions, SUPPA2.out.versions)
 
-    // 7. PROMOTER USAGE: transcript 5' ends (default) or proActiv (junction-based)
+    // 7. PROMOTER USAGE: proActiv (junction-based, default) or transcript 5' ends (--promoter_method tss)
     if (params.promoter_method == 'tss') {
-        PROMOTER_TSS(ch_extended_gtf, ch_transcript_counts, BAMBU.out.gene_counts, ch_design, reference)
+        PROMOTER_TSS(ch_extended_gtf, ch_transcript_counts, BAMBU.out.gene_counts, ch_design, reference, GTF_INTRONS.out.tx_ids)
         ch_promoter_versions = PROMOTER_TSS.out.versions
     } else {
-        PROACTIV(ch_extended_gtf, ch_design, ch_bams_for_cohort, ch_bais_for_cohort, reference)
+        if (covariates) {
+            log.warn "proActiv (getAlternativePromoters) does not model the design covariates (${covariates.join(', ')}); it compares conditions only"
+        }
+        PROACTIV(ch_extended_gtf, ch_design, ch_junction_tables, reference)
         ch_promoter_versions = PROACTIV.out.versions
     }
 

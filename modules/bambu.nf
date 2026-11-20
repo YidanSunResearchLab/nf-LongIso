@@ -1,6 +1,6 @@
 process BAMBU_PREP {
     tag "bambu_prep"
-    publishDir "${params.outdir}/bambu", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/bambu", mode: params.publish_dir_mode, pattern: "bambu_annotations.rds"
 
     input:
     path gtf
@@ -31,7 +31,7 @@ process BAMBU_PREP {
 
 process BAMBU {
     tag "bambu"
-    publishDir "${params.outdir}/bambu", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/bambu", mode: params.publish_dir_mode, pattern: "{*.rds,*.gtf,*.txt}"
 
     input:
     path bams

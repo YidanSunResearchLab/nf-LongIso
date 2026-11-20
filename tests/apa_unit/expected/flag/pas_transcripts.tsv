@@ -1,6 +1,9 @@
-transcript_id	gene_id	chr	strand	pos	annotated	reads	downstream_A_frac	downstream_A6	pas_signal	internal_priming	used	pas_id
-BambuTx1	G1	chrS	+	1000	FALSE	10	1	TRUE	NA	TRUE	TRUE	PAS1
-BambuTx2	G1	chrS	+	2000	FALSE	10	1	TRUE	AATAAA	FALSE	TRUE	PAS2
-BambuTx3	G1	chrS	+	3000	FALSE	10	1	TRUE	NA	FALSE	TRUE	PAS3
-ENST1	G1	chrS	+	3030	TRUE	10	0	FALSE	NA	FALSE	TRUE	PAS4
-ENST2	G2	chrS	+	4000	TRUE	10	1	TRUE	NA	FALSE	TRUE	PAS1
+transcript_id	gene_id	chr	strand	pos	annotated	reads	downstream_A_frac	downstream_A6	pas_signal	strong_pas_signal	internal_priming	used	pas_id
+BambuTx1	G1	chrS	+	1000	FALSE	10	1	TRUE	NA	FALSE	TRUE	TRUE	PAS1
+BambuTx2	G1	chrS	+	2000	FALSE	10	1	TRUE	AATAAA	TRUE	FALSE	TRUE	PAS2
+BambuTx3	G1	chrS	+	3000	FALSE	10	1	TRUE	NA	FALSE	FALSE	TRUE	PAS3
+ENST1	G1	chrS	+	3030	TRUE	10	0	FALSE	NA	FALSE	FALSE	TRUE	PAS4
+ENST2	G2	chrS	+	4000	TRUE	10	1	TRUE	NA	FALSE	FALSE	TRUE	PAS1
+BambuTx4	G3	chrS	+	4500	FALSE	10	1	TRUE	AAGAAA	FALSE	TRUE	TRUE	PAS1
+BambuTx5	G4	chrS	-	5000	FALSE	10	1	TRUE	NA	FALSE	TRUE	TRUE	PAS1
+BambuTx6	G5	chrS	-	5500	FALSE	10	1	TRUE	AATAAA	TRUE	FALSE	TRUE	PAS1

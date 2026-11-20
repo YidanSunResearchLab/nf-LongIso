@@ -50,7 +50,7 @@ if (opt$level == "transcript") {
 colnames(mat) <- strip_suffix(colnames(mat))
 rownames(mat) <- ids
 
-design <- read.csv(opt$design, stringsAsFactors = FALSE)
+design <- read_design(opt$design)
 missing <- setdiff(design$sample, colnames(mat))
 if (length(missing) > 0) {
     stop(sprintf("Samples missing from the count table: %s (columns: %s)",
@@ -63,6 +63,7 @@ coldata    <- design_coldata(design, opt[["design-formula"]], reference)
 conditions <- levels(coldata$condition)
 formula    <- design_formula(opt[["design-formula"]], coldata)
 check_full_rank(formula, coldata)
+rdf <- residual_df(formula, coldata)
 message(sprintf("Level: %s; conditions: %s; reference: %s; design: %s",
                 opt$level, paste(conditions, collapse = ", "), reference, deparse(formula)))
 
@@ -76,23 +77,35 @@ with_ids <- function(df) {
 dds <- DESeqDataSetFromMatrix(countData = mat, colData = coldata, design = formula)
 
 vsd <- tryCatch(vst(dds, blind = TRUE),
-                error = function(e) varianceStabilizingTransformation(dds, blind = TRUE))
+                error = function(e) tryCatch(varianceStabilizingTransformation(dds, blind = TRUE),
+                                             error = function(e2) NULL))
+# The PCA plot is descriptive: if it cannot be drawn (e.g. very few samples, non-finite transformed
+# values), a page with the reason is written instead of failing the step
 pdf("pca_plot.pdf", width = 7, height = 5)
-if (ncol(dds) > 1) {
-    print(plotPCA(vsd, intgroup = "condition") + theme_minimal())
-} else {
-    plot.new(); text(0.5, 0.5, "PCA requires > 1 sample")
+pca_msg <- if (ncol(dds) < 2) "PCA requires > 1 sample" else if (is.null(vsd)) "PCA: variance-stabilising transformation failed" else NULL
+if (is.null(pca_msg)) {
+    pca_msg <- tryCatch({ print(plotPCA(vsd, intgroup = "condition") + theme_minimal()); NULL },
+                        error = function(e) paste("PCA not drawn:", conditionMessage(e)))
 }
+if (!is.null(pca_msg)) { message(pca_msg); plot.new(); text(0.5, 0.5, pca_msg, cex = 0.8) }
 invisible(dev.off())
 
 # ---- 3. Differential expression --------------------------------------------------------------
 level_label <- if (opt$level == "gene") "genes" else "transcripts"
 mqc_rows <- list()
-if (length(conditions) > 1) {
+no_de <- NULL
+if (length(conditions) < 2) {
+    no_de <- "Single condition - no DE"
+} else if (rdf < 1) {
+    no_de <- sprintf(paste0("No DE: the design %s leaves no residual degrees of freedom (%d samples); ",
+                            "dispersions cannot be estimated without replicates"), deparse(formula), nrow(coldata))
+}
+if (is.null(no_de)) {
     dds <- run_deseq(dds)
     others <- setdiff(conditions, reference)
     for (cond in others) {
-        res <- as.data.frame(results(dds, contrast = c("condition", cond, reference)))
+        # alpha = 0.05: independent filtering is optimised for the padj cutoff used below
+        res <- as.data.frame(results(dds, contrast = c("condition", cond, reference), alpha = 0.05))
         out <- with_ids(res)
         out <- out[order(out$padj, out$id, na.last = TRUE), ]
         fname <- if (length(conditions) == 2) "DE_results.csv" else sprintf("DE_results_%s_vs_%s.csv", cond, reference)
@@ -109,8 +122,9 @@ if (length(conditions) > 1) {
         message(sprintf("%s vs %s: %d %s with padj < 0.05", cond, reference, sum(sig), level_label))
     }
 } else {
+    message(no_de)
     dds <- estimateSizeFactors(dds)
-    write.csv(data.frame(Message = "Single condition - no DE"), "DE_results.csv", row.names = FALSE)
+    write.csv(data.frame(Message = no_de), "DE_results.csv", row.names = FALSE)
 }
 
 # ---- 4. Normalised counts --------------------------------------------------------------------
@@ -125,5 +139,5 @@ writeLines(c(
     "# plot_type: 'table'"
 ), mqc_file)
 mqc <- if (length(mqc_rows) > 0) do.call(rbind, mqc_rows) else
-    data.frame(Comparison = "none (single condition)", Tested = NA, Significant = NA, Up = NA, Down = NA)
+    data.frame(Comparison = if (length(conditions) < 2) "none (single condition)" else "none (no replicates)", Tested = NA, Significant = NA, Up = NA, Down = NA)
 suppressWarnings(write.table(mqc, mqc_file, sep = "\t", quote = FALSE, row.names = FALSE, append = TRUE))

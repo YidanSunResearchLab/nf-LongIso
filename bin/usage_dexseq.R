@@ -20,8 +20,10 @@
 #   condition_1 (reference), condition_2, feature_id, gene_id, pvalue, padj (feature level),
 #   gene_qvalue (perGeneQValue), log2fold (DEXSeq), mean_<label>_1, mean_<label>_2,
 #   d<label> = mean_<label>_2 - mean_<label>_1, <label>_<sample> (feature share of the gene's reads)
-# When the test cannot be run (< 2 conditions, < 2 replicates per condition, no gene with >= 2
-# features) the file has a single 'Message' column explaining why.
+# Each comparison (condition vs reference) is checked separately: it is skipped, with a warning, when
+# either condition has < 2 replicates, its design is not of full rank or leaves no residual degrees of
+# freedom, or no gene has >= 2 features with reads. When no comparison can be tested (or there are
+# < 2 conditions) the file has a single 'Message' column giving the reasons.
 
 .script <- sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[1])
 source(file.path(dirname(normalizePath(.script)), "nli_design.R"))
@@ -43,16 +45,12 @@ placeholder <- function(msg) {
 
 # ---- 1. Inputs and replicate checks ---------------------------------------------------------------
 tab    <- read.delim(opt$counts, check.names = FALSE, stringsAsFactors = FALSE)
-design <- read.csv(opt$design, stringsAsFactors = FALSE)
+design <- read_design(opt$design)
 missing <- setdiff(design$sample, colnames(tab))
 if (length(missing) > 0) stop(sprintf("Samples missing from %s: %s", opt$counts, paste(missing, collapse = ", ")))
 
 n_rep <- table(design$condition)
 if (length(n_rep) < 2) placeholder(sprintf("Differential usage not tested: %d condition(s); at least 2 are required.", length(n_rep)))
-if (any(n_rep < 2)) {
-    placeholder(sprintf("Differential usage not tested: every condition needs >= 2 replicates (%s).",
-                        paste(sprintf("%s: %d", names(n_rep), as.integer(n_rep)), collapse = ", ")))
-}
 if (!reference %in% names(n_rep)) stop(sprintf("Reference condition '%s' not found", reference))
 
 # ---- 2. Filters ----------------------------------------------------------------------------------
@@ -93,7 +91,19 @@ fit_dexseq <- function(dxd, full, reduced) {
 }
 
 results <- list()
+skipped <- character(0)   # comparisons that could not be tested, with the reason
+skip <- function(cond, why) {
+    msg <- sprintf("%s vs %s: %s", cond, reference, why)
+    message("Skipped: ", msg); warning(msg)
+    skipped <<- c(skipped, msg)
+}
 for (cond in others) {
+    # Each comparison is checked on its own: a problem in one comparison does not stop the others
+    if (n_rep[[reference]] < 2 || n_rep[[cond]] < 2) {
+        skip(cond, sprintf("needs >= 2 replicates per condition (%s: %d, %s: %d)", reference, n_rep[[reference]],
+                           cond, n_rep[[cond]]))
+        next
+    }
     smp <- design$sample[design$condition %in% c(reference, cond)]
     sd  <- design[match(smp, design$sample), , drop = FALSE]
     cd  <- design_coldata(sd, opt[["design-formula"]], reference)
@@ -103,7 +113,13 @@ for (cond in others) {
                         cond, reference, paste(setdiff(covariates, covs), collapse = ", ")))
     }
     cd <- droplevels(cd[, c(covs, "condition"), drop = FALSE])
-    check_full_rank(as.formula(paste("~", paste(c(covs, "condition"), collapse = " + "))), cd)
+    cmp_formula <- as.formula(paste("~", paste(c(covs, "condition"), collapse = " + ")))
+    problem <- rank_problem(cmp_formula, cd)
+    if (!is.null(problem)) { skip(cond, problem); next }
+    if (residual_df(cmp_formula, cd) < 1) {
+        skip(cond, sprintf("the design %s leaves no residual degrees of freedom in this comparison", deparse(cmp_formula)))
+        next
+    }
     full    <- as.formula(paste("~ sample + exon", paste0(c(sprintf(" + %s:exon", covs), " + condition:exon"), collapse = "")))
     reduced <- as.formula(paste("~ sample + exon", paste0(sprintf(" + %s:exon", covs), collapse = "")))
     message(sprintf("%s vs %s: full %s; reduced %s", cond, reference, deparse(full), deparse(reduced)))
@@ -112,11 +128,11 @@ for (cond in others) {
     # Features or genes without reads in this comparison cannot be tested
     ok <- rowSums(sub_mat) > 0
     ok <- ok & tab$gene_id %in% names(which(tapply(ok, tab$gene_id, sum) >= 2))
-    if (sum(ok) == 0) { message(sprintf("%s vs %s: no testable gene", cond, reference)); next }
+    if (sum(ok) == 0) { skip(cond, "no gene with >= 2 features with reads in this comparison"); next }
     dxd <- DEXSeqDataSet(countData = sub_mat[ok, , drop = FALSE], sampleData = cd, design = full,
                          featureID = tab$feature_id[ok], groupID = tab$gene_id[ok])
     dxd <- fit_dexseq(dxd, full, reduced)
-    if (is.null(dxd)) { message(sprintf("%s vs %s: dispersions could not be estimated", cond, reference)); next }
+    if (is.null(dxd)) { skip(cond, "dispersions could not be estimated"); next }
     res <- DEXSeqResults(dxd)
     q   <- perGeneQValue(res)
     lfc_col <- grep("^log2fold_", colnames(res), value = TRUE)[1]
@@ -138,7 +154,8 @@ for (cond in others) {
     message(sprintf("%s vs %s: %d features in %d genes tested; %d genes with q < 0.05",
                     cond, reference, nrow(out), length(unique(out$gene_id)), sum(q < 0.05, na.rm = TRUE)))
 }
-if (length(results) == 0) placeholder("Differential usage not tested: DEXSeq could not be fitted for any comparison (see log).")
+if (length(results) == 0) placeholder(paste0("Differential usage not tested. ", paste(skipped, collapse = "; ")))
+if (length(skipped) > 0) message("Comparisons not tested: ", paste(skipped, collapse = "; "))
 
 # Comparisons may involve different samples: align the usage_<sample> columns
 all_cols <- unique(unlist(lapply(results, colnames)))

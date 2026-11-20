@@ -13,6 +13,7 @@ process ISOSWITCH {
     path design
     val  reference
     path nt_fasta       // transcript sequences (GFFREAD); [] when --isoswitch_consequences false
+    path ref_gtf        // reference annotation (--gtf): annotated CDS for reference transcripts
 
     output:
     path "isoform_switch_results.csv"        , emit: switch_results
@@ -28,7 +29,7 @@ process ISOSWITCH {
     path "versions.yml"                      , emit: versions
 
     script:
-    def consequences = nt_fasta ? "--nt-fasta=${nt_fasta} --n-plots=${params.isoswitch_n_plots}" : ''
+    def consequences = nt_fasta ? "--nt-fasta=${nt_fasta} --ref-gtf=${ref_gtf} --n-plots=${params.isoswitch_n_plots}" : ''
     """
     run_isoswitch.R \\
         --counts=${counts} \\

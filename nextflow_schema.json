@@ -244,7 +244,7 @@
                     "default": true,
                     "fa_icon": "fas fa-toggle-on",
                     "description": "Run SUPPA2 diffSplice for each non-reference condition vs the reference.",
-                    "help_text": "Runs only for conditions with at least 2 replicates, and only when the reference has at least 2 replicates. diffSplice does not model design covariates."
+                    "help_text": "Runs only for conditions with at least 2 replicates, and only when the reference has at least 2 replicates. The events of all types are tested together. diffSplice does not model design covariates."
                 },
                 "suppa2_diff_args": {
                     "type": "string",
@@ -261,7 +261,7 @@
                     "minimum": 0,
                     "maximum": 1,
                     "fa_icon": "fas fa-filter",
-                    "description": "p-value cutoff for the combined SUPPA2 significant-event table."
+                    "description": "Cutoff on padj (Benjamini-Hochberg over all events of a comparison) for the SUPPA2 significant-event table."
                 },
                 "suppa2_dpsi_cutoff": {
                     "type": "number",
@@ -327,13 +327,13 @@
             "properties": {
                 "promoter_method": {
                     "type": "string",
-                    "default": "tss",
+                    "default": "proactiv",
                     "enum": [
-                        "tss",
-                        "proactiv"
+                        "proactiv",
+                        "tss"
                     ],
                     "fa_icon": "fas fa-play",
-                    "description": "'tss': promoters = clusters of transcript 5' ends, counted with Bambu read counts and tested with DEXSeq; 'proactiv': proActiv on splice junctions (misses single-exon transcripts)."
+                    "description": "'proactiv' (default): proActiv on the stranded splice junctions (results/proactiv/; promoters of single-exon transcripts are not quantified); 'tss': promoters = clusters of transcript 5' ends, counted with Bambu read counts and tested with DEXSeq (results/promoter_tss/)."
                 },
                 "tss_cluster_window": {
                     "type": "integer",
@@ -391,7 +391,7 @@
                     "description": "R arguments for getAlternativePromoters() (thresholds for alternative promoters)."
                 }
             },
-            "description": "Promoters from transcript 5' ends (--promoter_method tss, default) or junction-based proActiv."
+            "description": "Promoter usage: proActiv on the stranded splice junctions (default) or, with --promoter_method tss, promoters from transcript 5' ends."
         },
         "qc_options": {
             "title": "Read QC and transcript classification options",

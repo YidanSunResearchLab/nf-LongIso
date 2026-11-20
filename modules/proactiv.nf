@@ -1,16 +1,16 @@
 /*
- * Promoter activity and alternative promoters (proActiv). R code: bin/run_proactiv.R
+ * Promoter activity and alternative promoters (proActiv; default --promoter_method). R code:
+ * bin/run_proactiv.R. Input: the stranded junction tables of EXTRACT_JUNCTIONS.
  */
 
 process PROACTIV {
     tag "proactiv"
-    publishDir "${params.outdir}/promoter", mode: params.publish_dir_mode, pattern: "*.tsv"
+    publishDir "${params.outdir}/proactiv", mode: params.publish_dir_mode, pattern: "*.tsv"
 
     input:
     path gtf
     path design
-    path bams
-    path bais
+    path junctions      // <sample>.junctions.tsv (chr, start, end, strand, reads, motif, annotated)
     val  reference
 
     output:

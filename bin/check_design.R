@@ -13,7 +13,7 @@ source(file.path(dirname(normalizePath(.script)), "nli_design.R"))
 opt <- parse_args(commandArgs(trailingOnly = TRUE))
 for (k in c("design", "design-formula", "reference")) if (is.null(opt[[k]])) stop(sprintf("Missing required argument --%s", k))
 
-design  <- read.csv(opt$design, stringsAsFactors = FALSE)
+design  <- read_design(opt$design)
 coldata <- design_coldata(design, opt[["design-formula"]], opt$reference)
 formula <- design_formula(opt[["design-formula"]], coldata)
 check_full_rank(formula, coldata)

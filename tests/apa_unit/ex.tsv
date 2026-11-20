@@ -3,3 +3,6 @@ BambuTx2	G1	chrS	1500	2000	+
 BambuTx3	G1	chrS	2500	3000	+
 ENST1	G1	chrS	2500	3030	+
 ENST2	G2	chrS	3500	4000	+
+BambuTx4	G3	chrS	4300	4500	+
+BambuTx5	G4	chrS	5000	5200	-
+BambuTx6	G5	chrS	5500	5700	-

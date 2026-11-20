@@ -6,16 +6,24 @@
 #   run_isoswitch.R --counts=counts_transcript.txt --abundance=CPM_transcript.txt \
 #               --gtf=extended_annotations.gtf --design=design.csv --design-formula="~ condition" \
 #               --reference=control \
-#               --alpha=0.05 --dif-cutoff=0.1 [--nt-fasta=transcripts.fa --n-plots=10]
+#               --alpha=0.05 --dif-cutoff=0.1 [--nt-fasta=transcripts.fa --ref-gtf=genes.gtf --n-plots=10]
 #
-# With --nt-fasta (transcript sequences, e.g. from gffread), ORFs are predicted (analyzeORF, longest
-# ORF, no BSgenome needed) and switch consequences are analysed (types that need no external tools).
+# The DEXSeq switch test uses the --design formula as given (importRdata detectUnwantedEffects = FALSE:
+# no surrogate variables are added, so the model is the same as in DESeq2 and the usage tests).
+#
+# With --nt-fasta (transcript sequences, e.g. from gffread), ORFs are added and switch consequences are
+# analysed (types that need no external tools; no BSgenome needed):
+#   * with --ref-gtf (reference annotation with CDS records): annotated transcripts get their annotated
+#     CDS, or none if the annotation has no CDS for them (addORFfromGTF); novel transcripts get a
+#     predicted ORF (analyzeNovelIsoformORF, longest ORF using annotated start codons where possible);
+#   * without --ref-gtf, or when it has no CDS records: all ORFs are predicted (analyzeORF, longest).
+# Column orf_source (annotated / predicted / empty = no ORF) is added to the switch tables.
 #
 # Every non-reference condition is compared with the reference (condition_1 = reference,
 # condition_2 = other condition; dIF and dPAU are condition_2 - condition_1).
 #
 # Outputs
-#   isoform_switch_results.csv        isoformFeatures for all comparisons (required)
+#   isoform_switch_results.csv        isoformFeatures for all comparisons, with orf_source (required)
 #   significant_switches.csv          q < alpha and |dIF| > dif-cutoff (required)
 #   all_AS_events.csv, atss_results.csv, atts_results.csv
 #   switchlist.rds
@@ -51,7 +59,7 @@ colnames(abund_data)[1]  <- "isoform_id"
 colnames(counts_data) <- strip_suffix(colnames(counts_data))
 colnames(abund_data)  <- strip_suffix(colnames(abund_data))
 
-design  <- read.csv(opt$design, stringsAsFactors = FALSE)
+design  <- read_design(opt$design)
 missing <- setdiff(design$sample, intersect(colnames(counts_data), colnames(abund_data)))
 if (length(missing) > 0) stop(sprintf("Samples missing from the count tables: %s", paste(missing, collapse = ", ")))
 
@@ -110,7 +118,8 @@ switchList <- importRdata(
     isoformNtFasta       = opt[["nt-fasta"]],
     comparisonsToMake    = comparisons,
     showProgress         = FALSE,
-    fixStringTieAnnotationProblem = TRUE
+    fixStringTieAnnotationProblem = TRUE,
+    detectUnwantedEffects = FALSE
 )
 switchList <- preFilter(switchList)
 switchList <- isoformSwitchTestDEXSeq(switchList, reduceToSwitchingGenes = FALSE)
@@ -129,9 +138,6 @@ if (!is.null(as_analysis) && nrow(as_analysis) > 0) {
     message("No alternative splicing results")
 }
 
-feat <- switchList$isoformFeatures
-clean_id <- function(x) trimws(gsub('"', '', sub(".*:", "", as.character(x))))
-feat$iso_clean <- clean_id(feat$isoform_id)
 
 # ---- 3. Switch consequences (with transcript sequences) ------------------------------------------
 CONSEQUENCES <- c("intron_retention", "ORF_seq_similarity", "NMD_status", "tss", "tts",
@@ -139,8 +145,34 @@ CONSEQUENCES <- c("intron_retention", "ORF_seq_similarity", "NMD_status", "tss",
 message_pdf <- function(file, msg) { pdf(file, width = 8, height = 4); plot.new(); text(0.5, 0.5, msg, cex = 0.9); invisible(dev.off()) }
 if (!is.null(opt[["nt-fasta"]])) {
     n_plots <- as.integer(if (is.null(opt[["n-plots"]])) 10 else opt[["n-plots"]])
-    switchList <- analyzeORF(switchList, orfMethod = "longest", showProgress = FALSE)
-    message("ORFs predicted: ", sum(!is.na(switchList$orfAnalysis$orfTransciptStart)))
+    ref_gtf <- opt[["ref-gtf"]]
+    orf_annotated <- FALSE
+    if (!is.null(ref_gtf)) {
+        # Annotated CDS for reference transcripts; fails (or adds none) when the GTF has no CDS records
+        # overwriteExistingORF: importRdata already created an ORF table (the Bambu GTF has no CDS).
+        # quiet = FALSE: in IsoformSwitchAnalyzeR 2.6.0, quiet = TRUE makes these functions return NULL.
+        res <- tryCatch(addORFfromGTF(switchList, pathToGTF = ref_gtf, overwriteExistingORF = TRUE, quiet = FALSE),
+                        error = function(e) { message("addORFfromGTF: ", conditionMessage(e)); NULL })
+        if (!is.null(res) && any(res$orfAnalysis$orf_origin == "Annotation", na.rm = TRUE)) {
+            switchList <- res
+            orf_annotated <- TRUE
+            # Novel isoforms only: annotated transcripts without a CDS (e.g. lncRNAs) keep "no ORF".
+            # The function stops when there is nothing to predict, so it is only called for novel isoforms.
+            novel <- is.na(switchList$orfAnalysis$orf_origin) | switchList$orfAnalysis$orf_origin == "not_annotated_yet"
+            if (any(novel)) {
+                switchList <- analyzeNovelIsoformORF(switchList, analysisAllIsoformsWithoutORF = FALSE,
+                                                     showProgress = FALSE, quiet = FALSE)
+            }
+        } else {
+            message("No annotated CDS could be added from ", ref_gtf, ": all ORFs are predicted")
+        }
+    }
+    if (!orf_annotated) switchList <- analyzeORF(switchList, orfMethod = "longest", showProgress = FALSE)
+    oa <- switchList$orfAnalysis
+    message(sprintf("ORFs: %d annotated (reference CDS), %d predicted, %d isoforms without ORF",
+                    sum(oa$orf_origin == "Annotation" & !is.na(oa$orfTransciptStart), na.rm = TRUE),
+                    sum(oa$orf_origin != "Annotation" & !is.na(oa$orfTransciptStart), na.rm = TRUE),
+                    sum(is.na(oa$orfTransciptStart))))
     # ORF amino-acid sequences (needed for ORF_seq_similarity); uses the transcript sequences already
     # in the switch list, no genome object
     switchList <- tryCatch(
@@ -210,6 +242,18 @@ if (!is.null(opt[["nt-fasta"]])) {
 
 # ---- 4. Switch tables --------------------------------------------------------------------------
 saveRDS(switchList, "switchlist.rds")
+feat <- switchList$isoformFeatures
+clean_id <- function(x) trimws(gsub('"', '', sub(".*:", "", as.character(x))))
+feat$iso_clean <- clean_id(feat$isoform_id)          # kept from v0.1.0
+# ORF source per isoform: annotated (reference CDS), predicted, or empty (no ORF / no sequences)
+oa <- switchList$orfAnalysis
+if (!is.null(oa) && nrow(oa) > 0) {
+    src <- ifelse(is.na(oa$orfTransciptStart), NA_character_,
+                  ifelse(oa$orf_origin == "Annotation", "annotated", "predicted"))
+    feat$orf_source <- src[match(feat$isoform_id, oa$isoform_id)]
+} else {
+    feat$orf_source <- NA_character_
+}
 write.csv(feat, "isoform_switch_results.csv", row.names = FALSE)
 sig_switch <- feat[which(feat$isoform_switch_q_value < alpha & abs(feat$dIF) > dif_cutoff), ]
 write.csv(sig_switch, "significant_switches.csv", row.names = FALSE)

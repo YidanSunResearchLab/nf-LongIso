@@ -58,8 +58,10 @@ process SUPPA2 {
 /*
  * Differential splicing (SUPPA2 diffSplice), each non-reference condition vs the reference.
  * Runs only with >= 2 replicates in the reference and in the compared condition (decided in main.nf).
- * PSI values come from the count-based psiPerEvent output (PSI is a within-gene ratio, so counts and
- * CPM give the same PSI); the expression files passed with -e are the Bambu CPM values.
+ * As in the SUPPA2 workflow, the events of all types are merged and tested together (one empirical
+ * background per comparison). PSI values come from the count-based psiPerEvent output (PSI is a
+ * within-gene ratio, so counts and CPM give the same PSI); the expression files passed with -e are the
+ * Bambu CPM values. bin/suppa2_results.py adds a genome-wide Benjamini-Hochberg padj.
  */
 
 process SUPPA2_DIFFSPLICE {
@@ -71,12 +73,13 @@ process SUPPA2_DIFFSPLICE {
     path psi            // events_<type>_samples.psi
     path cpm            // Bambu CPM_transcript.txt (TXNAME, GENEID, samples...)
     path design         // design.csv (sample,condition[,covariates])
-    val reference       // reference condition
-    val conditions      // non-reference conditions to compare with the reference
+    val  reference      // reference condition
+    val  conditions     // non-reference conditions to compare with the reference
 
     output:
     path "*.dpsi"                                 , emit: dpsi, optional: true
     path "*.psivec"                               , emit: psivec, optional: true
+    path "suppa2_diffsplice_results.tsv"          , emit: results
     path "suppa2_diffsplice_significant.tsv"      , emit: significant
     path "versions.yml"                           , emit: versions
 
@@ -89,37 +92,45 @@ process SUPPA2_DIFFSPLICE {
         awk -v cond="\$1" -f "\$(command -v split_condition.awk)" fileno=1 ${design} fileno=2 "\$2" > "\$3"
     }
 
-    sig_args=""
-    for cond in '${reference}' ${conds}; do
-        mkdir -p "split/\$cond"
-        split_cols "\$cond" expression_cpm.tsv "split/\$cond/expression.tpm"
-    done
+    # Merge the event types that have events (a header-only PSI file would make diffSplice fail)
+    : > events_all.ioe; : > events_all.psi
     for ioe_file in events_*_strict.ioe; do
-        [ -s "\$ioe_file" ] || continue
         type=\$(basename "\$ioe_file" _strict.ioe); type=\${type#events_}
         psi_file="events_\${type}_samples.psi"
-        [ -s "\$psi_file" ] || continue
-        for cond in '${reference}' ${conds}; do
-            split_cols "\$cond" "\$psi_file" "split/\$cond/\$type.psi"
-        done
-        for cond in ${conds}; do
-            # Files are named after the conditions: SUPPA2 uses the PSI file names in the .dpsi header
-            mkdir -p "cmp_\$cond"
-            ln -sf "../split/${reference}/\$type.psi" "cmp_\$cond/${reference}.psi"
-            ln -sf "../split/\$cond/\$type.psi" "cmp_\$cond/\$cond.psi"
-            prefix="\${cond}_vs_${reference}_\${type}"
-            suppa.py diffSplice ${args} -i "\$ioe_file" \\
-                -p "cmp_\$cond/${reference}.psi" "cmp_\$cond/\$cond.psi" \\
-                -e "split/${reference}/expression.tpm" "split/\$cond/expression.tpm" \\
-                -o "\$prefix"
-            sig_args="\$sig_args cmp=\${cond}_vs_${reference} type=\$type \$prefix.dpsi"
-        done
+        if [ ! -s "\$psi_file" ] || [ "\$(wc -l < "\$psi_file")" -le 1 ]; then
+            echo "\$type: no events - not tested"
+            continue
+        fi
+        [ -s events_all.ioe ] || head -n 1 "\$ioe_file" > events_all.ioe
+        [ -s events_all.psi ] || head -n 1 "\$psi_file" > events_all.psi
+        tail -n +2 "\$ioe_file" >> events_all.ioe
+        tail -n +2 "\$psi_file" >> events_all.psi
+        echo "\$type: \$(( \$(wc -l < "\$psi_file") - 1 )) events"
     done
 
-    # Combined table of significant events (p < suppa2_alpha, |dPSI| > suppa2_dpsi_cutoff; dPSI = condition - reference)
-    awk -v alpha=${params.suppa2_alpha} -v dpsi=${params.suppa2_dpsi_cutoff} -f "\$(command -v suppa2_significant.awk)" \$sig_args < /dev/null \\
-        > suppa2_diffsplice_significant.tsv
-    echo "Significant events (p < ${params.suppa2_alpha}, |dPSI| > ${params.suppa2_dpsi_cutoff}): \$(( \$(wc -l < suppa2_diffsplice_significant.tsv) - 1 ))"
+    dpsi_args=""
+    if [ -s events_all.psi ]; then
+        for cond in '${reference}' ${conds}; do
+            mkdir -p "split/\$cond"
+            split_cols "\$cond" expression_cpm.tsv "split/\$cond/expression.tpm"
+            split_cols "\$cond" events_all.psi "split/\$cond/\$cond.psi"
+        done
+        for cond in ${conds}; do
+            # The PSI files are named after the conditions: SUPPA2 uses the file names in the .dpsi header
+            prefix="\${cond}_vs_${reference}"
+            suppa.py diffSplice ${args} -i events_all.ioe \\
+                -p "split/${reference}/${reference}.psi" "split/\$cond/\$cond.psi" \\
+                -e "split/${reference}/expression.tpm" "split/\$cond/expression.tpm" \\
+                -o "\$prefix"
+            dpsi_args="\$dpsi_args \$prefix=\$prefix.dpsi"
+        done
+    else
+        echo "No splicing events with PSI values: diffSplice not run"
+    fi
+
+    # All tested events with a genome-wide padj, and the significant ones (padj < suppa2_alpha,
+    # |dPSI| > suppa2_dpsi_cutoff; dPSI = condition - reference)
+    suppa2_results.py --alpha ${params.suppa2_alpha} --dpsi ${params.suppa2_dpsi_cutoff} \$dpsi_args
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -129,8 +140,9 @@ process SUPPA2_DIFFSPLICE {
 
     stub:
     """
-    touch treatment_vs_control_SE.dpsi treatment_vs_control_SE.psivec
-    printf 'comparison\\tevent_type\\tevent_id\\tgene_id\\tdPSI\\tp_value\\n' > suppa2_diffsplice_significant.tsv
+    touch treatment_vs_control.dpsi treatment_vs_control.psivec
+    printf 'comparison\\tevent_type\\tevent_id\\tgene_id\\tdPSI\\tpvalue\\tpadj\\n' > suppa2_diffsplice_results.tsv
+    cp suppa2_diffsplice_results.tsv suppa2_diffsplice_significant.tsv
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         stub: "stub"

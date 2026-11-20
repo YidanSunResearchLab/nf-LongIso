@@ -58,7 +58,7 @@ process TE_DESEQ2 {
     val  reference
 
     output:
-    path "DE_TE_${type}_results*.csv", optional: true, emit: de_results
+    path "DE_TE_${type}_results*.csv"                , emit: de_results
     path "norm_counts_${type}.csv"   , emit: norm_counts
     path "volcano_${type}.pdf"       , optional: true, emit: volcano
     path "pca_${type}.pdf"           , emit: pca

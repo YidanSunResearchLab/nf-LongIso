@@ -34,7 +34,7 @@ strip_suffix <- function(x) sub("[.]sorted([.]bam)?$", "", x)
 # ---- 1. Load ---------------------------------------------------------------------------------
 te_data   <- read.delim(opt[["te-counts"]], check.names = FALSE, stringsAsFactors = FALSE)
 gene_data <- read.delim(opt[["gene-counts"]], check.names = FALSE, stringsAsFactors = FALSE)
-design    <- read.csv(opt$design, stringsAsFactors = FALSE)
+design    <- read_design(opt$design)
 
 if (type == "Family") {
     rownames(te_data) <- make.unique(as.character(te_data[, 1]))
@@ -64,6 +64,27 @@ conditions <- levels(coldata$condition)
 formula    <- design_formula(opt[["design-formula"]], coldata)
 check_full_rank(formula, coldata)
 
+# Why the test cannot be run (written to the results file instead of failing)
+no_de <- NULL
+if (nrow(te_mat) == 0 || sum(te_mat) == 0) {
+    no_de <- sprintf(paste0("No TE %s has any read: check that the chromosome names of --te_gtf match --genome ",
+                            "and --gtf (e.g. 'chr1' vs '1')"), tolower(type))
+} else if (length(conditions) < 2) {
+    no_de <- "Single condition - no DE"
+} else if (residual_df(formula, coldata) < 1) {
+    no_de <- sprintf("No DE: the design %s leaves no residual degrees of freedom (no replicates)", deparse(formula))
+}
+if (!is.null(no_de)) message(no_de)
+if (nrow(te_mat) == 0 || sum(te_mat) == 0) {
+    # No TE read at all: placeholder outputs (DESeq2 cannot build an object from an empty or all-zero
+    # table); the normalised counts are all 0
+    write.csv(data.frame(Message = no_de), sprintf("DE_TE_%s_results.csv", type), row.names = FALSE)
+    write.csv(merge(te_meta, data.frame(ID_JOIN = te_ids, te_mat, check.names = FALSE), by = "ID_JOIN"),
+              sprintf("norm_counts_%s.csv", type), row.names = FALSE)
+    pdf(sprintf("pca_%s.pdf", type)); plot.new(); text(0.5, 0.5, no_de, cex = 0.7); invisible(dev.off())
+    quit(save = "no", status = 0)
+}
+
 # ---- 2. Size factors from gene-level counts -----------------------------------------------------
 dds_gene <- estimateSizeFactors(DESeqDataSetFromMatrix(countData = gene_mat, colData = coldata, design = formula))
 sf <- sizeFactors(dds_gene)
@@ -73,11 +94,13 @@ dds <- DESeqDataSetFromMatrix(countData = te_mat, colData = coldata, design = fo
 sizeFactors(dds) <- sf
 
 # ---- 3. DESeq2 -------------------------------------------------------------------------------
-if (length(conditions) > 1) {
+if (!is.null(no_de)) {
+    write.csv(data.frame(Message = no_de), sprintf("DE_TE_%s_results.csv", type), row.names = FALSE)
+} else {
     dds <- run_deseq(dds)   # keeps the pre-assigned size factors
     pdf(sprintf("volcano_%s.pdf", type))
     for (cond in setdiff(conditions, reference)) {
-        res <- as.data.frame(results(dds, contrast = c("condition", cond, reference)))[te_ids, ]
+        res <- as.data.frame(results(dds, contrast = c("condition", cond, reference), alpha = 0.05))[te_ids, ]
         res$ID_JOIN <- rownames(res)
         fname <- if (length(conditions) == 2) sprintf("DE_TE_%s_results.csv", type) else
             sprintf("DE_TE_%s_results_%s_vs_%s.csv", type, cond, reference)

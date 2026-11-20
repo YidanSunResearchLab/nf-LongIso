@@ -240,17 +240,20 @@ process GTF_INTRONS {
     path gtf
 
     output:
-    path "gtf_introns.tsv", emit: introns
-    path "versions.yml"   , emit: versions
+    path "gtf_introns.tsv"          , emit: introns
+    path "reference_transcripts.txt", emit: tx_ids    // transcript IDs of the reference annotation
+    path "versions.yml"             , emit: versions
 
     script:
-    // Exons reduced to transcript_id, chr, start, end, strand; introns between consecutive exons
+    // Exons reduced to transcript_id, chr, start, end, strand (exons without transcript_id are skipped);
+    // introns between consecutive exons of the same transcript on the same chromosome
     """
-    awk -F '\\t' -v OFS='\\t' '\$3 == "exon" { match(\$9, /transcript_id "[^"]+"/); print substr(\$9, RSTART + 15, RLENGTH - 16), \$1, \$4, \$5, \$7 }' ${gtf} \\
-        | sort -k1,1 -k3,3n \\
-        | awk -f "\$(command -v gtf_introns.awk)" \\
-        | sort -u > gtf_introns.tsv
-    echo "Annotated introns: \$(wc -l < gtf_introns.tsv)"
+    set -o pipefail
+    awk -F '\\t' -v OFS='\\t' '\$3 == "exon" && match(\$9, /transcript_id "[^"]+"/) { print substr(\$9, RSTART + 15, RLENGTH - 16), \$1, \$4, \$5, \$7 }' ${gtf} \\
+        > exons.tsv
+    sort -k1,1 -k2,2 -k3,3n exons.tsv | awk -f "\$(command -v gtf_introns.awk)" | sort -u > gtf_introns.tsv
+    cut -f1 exons.tsv | sort -u > reference_transcripts.txt
+    echo "Annotated introns: \$(wc -l < gtf_introns.tsv); reference transcripts: \$(wc -l < reference_transcripts.txt)"
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -260,7 +263,7 @@ process GTF_INTRONS {
 
     stub:
     """
-    touch gtf_introns.tsv
+    touch gtf_introns.tsv reference_transcripts.txt
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         stub: "stub"
