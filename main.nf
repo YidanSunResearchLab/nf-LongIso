@@ -40,23 +40,54 @@ def designCovariates(design) {
 }
 
 /*
+ * Numeric covariates (--numeric_covariates 'age,rin'): each must be a covariate of --design.
+ */
+def numericCovariates(value, covariates) {
+    def nums = value ? value.toString().split(',').collect { c -> c.trim() }.findAll { c -> c } : []
+    def unknown = nums.findAll { c -> !(c in covariates) }
+    if (unknown) {
+        error "--numeric_covariates lists ${unknown.join(', ')}, which ${unknown.size() == 1 ? 'is not a covariate' : 'are not covariates'} of --design '${params.design}'"
+    }
+    return nums.unique()
+}
+
+/*
  * Read and check the samplesheet. Returns a list of [meta, file] where file is the
  * FASTQ or BAM column, depending on --input_type; meta.covariates holds the design covariates.
  */
-def readSamplesheet(samplesheet, input_type, covariates) {
+def readSamplesheet(samplesheet, input_type, covariates, numeric) {
     def rows = samplesheetToList(samplesheet, "${projectDir}/assets/schema_input.json")
     // Covariate columns are not part of the schema: read them from the CSV itself
     def table = covariates ? file(samplesheet).splitCsv(header: true) : []
-    def name_rule = /^[A-Za-z][A-Za-z0-9_]*$/
+    def column_rule = /^[A-Za-z][A-Za-z0-9_]*$/        // covariate column names are R formula terms
+    def value_rule  = /^[A-Za-z0-9][A-Za-z0-9._-]*$/   // categorical values: same rule as sample names
+    def number_rule = /^[+-]?([0-9]+[.]?[0-9]*|[.][0-9]+)([eE][+-]?[0-9]+)?$/
     covariates.each { c ->
-        if (!(c ==~ name_rule)) error "Covariate column name '${c}' must match ${name_rule}"
+        if (!(c ==~ column_rule)) error "Covariate column name '${c}' must match ${column_rule}"
         if (!table || !table[0].containsKey(c)) error "--design uses column '${c}', which is not in the samplesheet"
-        def values = table.collect { r -> r[c]?.toString()?.trim() }
-        def bad = values.findAll { v -> !(v ==~ name_rule) }
-        if (bad) {
-            error "Samplesheet column '${c}' (used in --design) has invalid value(s) ${bad.unique().collect { v -> "'${v}'" }.join(', ')}: values must start with a letter and contain only letters, digits and underscores"
+        def values = table.collect { r -> r[c]?.toString()?.trim() ?: '' }
+        if (c in numeric) {
+            def bad = values.findAll { v -> !(v ==~ number_rule) }
+            if (bad) {
+                error "Samplesheet column '${c}' (in --numeric_covariates) has non-numeric or missing value(s) ${bad.unique().collect { v -> "'${v}'" }.join(', ')}"
+            }
+            if (values.collect { v -> v as BigDecimal }.unique(false).size() < 2) {
+                error "Samplesheet column '${c}' (used in --design) has a single value; remove it from --design"
+            }
+        } else {
+            def bad = values.findAll { v -> !(v ==~ value_rule) }
+            if (bad) {
+                error "Samplesheet column '${c}' (used in --design) has invalid value(s) ${bad.unique().collect { v -> "'${v}'" }.join(', ')}: " +
+                      "values must start with a letter or digit and contain only letters, digits, '.', '_' and '-' " +
+                      "(or list the column in --numeric_covariates if it is numeric)"
+            }
+            if (values.unique(false).size() < 2) error "Samplesheet column '${c}' (used in --design) has a single value; remove it from --design"
+            def levels = values.unique(false).size()
+            if (values.every { v -> v ==~ number_rule } && levels > 2) {
+                log.warn "Covariate '${c}' has only numeric values and is modelled as categorical (${levels} levels). " +
+                         "If it is a continuous variable, list it in --numeric_covariates."
+            }
         }
-        if (values.unique(false).size() < 2) error "Samplesheet column '${c}' (used in --design) has a single value; remove it from --design"
     }
     def cov_by_sample = table.collectEntries { r -> [ (r.sample.toString().trim()): covariates.collectEntries { c -> [ (c): r[c].toString().trim() ] } ] }
     def samples = rows.collect { row ->
@@ -69,12 +100,32 @@ def readSamplesheet(samplesheet, input_type, covariates) {
         }
         [ meta, f ]
     }
-    samples.groupBy { s -> s[0].condition }.each { cond, s ->
-        if (s.size() < 2) {
-            log.warn "Condition '${cond}' has only ${s.size()} replicate(s). Differential analyses need at least 2 replicates per condition for reliable results."
-        }
-    }
     return samples
+}
+
+/*
+ * Warn about conditions without replicates. Nothing is stopped: each differential test checks its own
+ * requirements and writes a 'Message' instead of results when it cannot be run.
+ */
+def warnReplicates(n_reps, reference) {
+    def unreplicated = n_reps.findAll { c, n -> n < 2 }.keySet().sort()
+    if (!unreplicated) return
+    if (unreplicated.size() == n_reps.size()) {
+        log.warn "No condition has replicates (${n_reps.collect { c, n -> "${c}: ${n}" }.join(', ')}). " +
+                 "Statistical tests are skipped (DESeq2, TE DESeq2, IsoformSwitchAnalyzeR, SUPPA2 diffSplice, APA and promoter " +
+                 "usage tests, proActiv alternative promoters); their result files contain a 'Message' column. " +
+                 "Alignment, quantification, normalised counts, PSI values, TE and junction annotation and QC are still produced."
+        return
+    }
+    // proActiv compares the reference with all other conditions pooled
+    def n_other = n_reps.findAll { c, n -> c != reference }.values().sum() ?: 0
+    def proactiv_skipped = params.promoter_method == 'proactiv' && (n_reps[reference] < 2 || n_other < 2)
+    unreplicated.each { c ->
+        log.warn "Condition '${c}' has only 1 sample. Tests that need replicates in each condition skip " +
+                 "${c == reference ? 'all comparisons with this reference condition' : 'this condition'} " +
+                 "(IsoformSwitchAnalyzeR, SUPPA2 diffSplice, APA and promoter usage tests${proactiv_skipped ? ', proActiv alternative promoters' : ''}); " +
+                 "DESeq2 still tests it when the other samples leave residual degrees of freedom."
+    }
 }
 
 /*
@@ -105,10 +156,12 @@ workflow {
 
     // 1. INPUT
     def covariates = designCovariates(params.design)
-    def samples   = readSamplesheet(params.samplesheet, params.input_type, covariates)
+    def numeric    = numericCovariates(params.numeric_covariates, covariates)
+    def samples   = readSamplesheet(params.samplesheet, params.input_type, covariates, numeric)
     def reference = resolveReference(samples, params.reference_condition)
     def conditions = samples.collect { s -> s[0].condition }.unique().sort()
     def n_reps = conditions.collectEntries { c -> [ (c): samples.count { s -> s[0].condition == c } ] }
+    warnReplicates(n_reps, reference)
     // SUPPA2 diffSplice: each non-reference condition with >= 2 replicates vs a reference with >= 2 replicates
     def diff_conditions = n_reps[reference] >= 2 ? conditions.findAll { c -> c != reference && n_reps[c] >= 2 } : []
     log.info """
@@ -116,7 +169,7 @@ workflow {
           Input type          : ${params.input_type} (${samples.size()} samples)
           Conditions          : ${conditions.join(', ')}
           Reference condition : ${reference}${params.reference_condition ? '' : ' (chosen automatically)'}
-          Design              : ${params.design}${covariates ? " (covariates: ${covariates.join(', ')})" : ''}
+          Design              : ${params.design}${covariates ? " (covariates: ${covariates.collect { c -> c in numeric ? "${c} [numeric]" : c }.join(', ')})" : ''}
           Genome / GTF        : ${params.genome} / ${params.gtf}
           TE analysis         : ${params.te_gtf ? "on (${params.te_gtf}); te_count_mode=${params.te_count_mode}, te_min_overlap=${params.te_min_overlap}, te_strand=${params.te_strand}" : 'off (no --te_gtf)'}
           minimap2            : ${params.input_type == 'fastq' ? "preset=${params.minimap2_preset}, junc_bed=${params.minimap2_junc_bed}, index=${params.minimap2_index ?: 'built by the pipeline'}, args='${params.minimap2_args}'" : 'not used (BAM input)'}

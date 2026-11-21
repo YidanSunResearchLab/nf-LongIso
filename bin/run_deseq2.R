@@ -10,6 +10,7 @@
 #                counts_transcript.txt (TXNAME, GENEID, samples...) for --level transcript
 #   --design     CSV with columns sample,condition and any covariate columns
 #   --design-formula  design formula, last term condition (e.g. "~ batch + condition")
+#   --numeric-covariates  optional: covariates of the design that are numeric (comma-separated)
 #   --level      gene | transcript
 #   --reference  reference condition (denominator of every fold change)
 #
@@ -59,7 +60,7 @@ if (length(missing) > 0) {
 mat <- round(as.matrix(mat[, design$sample, drop = FALSE]))
 
 reference  <- opt$reference
-coldata    <- design_coldata(design, opt[["design-formula"]], reference)
+coldata    <- design_coldata(design, opt[["design-formula"]], reference, numeric_covariates(opt[["numeric-covariates"]]))
 conditions <- levels(coldata$condition)
 formula    <- design_formula(opt[["design-formula"]], coldata)
 check_full_rank(formula, coldata)

@@ -77,6 +77,12 @@ jobs:
           test -s results_stub_cov/sqanti3/sqanti3_category_counts.tsv
           test -s results_stub_cov/suppa2/diffsplice/suppa2_diffsplice_significant.tsv
 
+      - name: Stub run with relaxed sample/condition names and a numeric covariate
+        run: |
+          nextflow run main.nf -profile test,docker -stub --outdir results_stub_names \
+            --samplesheet tests/samplesheet_test_names_numeric.csv --reference_condition ctrl-1 \
+            --design '~ rin + condition' --numeric_covariates rin
+
   test:
     name: Real runs of the test profile (Docker)
     if: github.event_name == 'workflow_dispatch'

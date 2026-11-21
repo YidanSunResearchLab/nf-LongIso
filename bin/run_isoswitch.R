@@ -7,6 +7,7 @@
 #               --gtf=extended_annotations.gtf --design=design.csv --design-formula="~ condition" \
 #               --reference=control \
 #               --alpha=0.05 --dif-cutoff=0.1 [--nt-fasta=transcripts.fa --ref-gtf=genes.gtf --n-plots=10]
+#               [--numeric-covariates=age,rin]   (covariates of the design that are numeric)
 #
 # The DEXSeq switch test uses the --design formula as given (importRdata detectUnwantedEffects = FALSE:
 # no surrogate variables are added, so the model is the same as in DESeq2 and the usage tests).
@@ -97,12 +98,58 @@ design <- design[design$condition %in% c(reference, others), ]
 covariates <- design_covariates(opt[["design-formula"]])
 if (length(covariates) > 0) {
     # Covariates are passed as extra designMatrix columns (used by the DEXSeq-based switch test)
-    cd <- design_coldata(design, opt[["design-formula"]], reference)
+    cd <- design_coldata(design, opt[["design-formula"]], reference, numeric_covariates(opt[["numeric-covariates"]]))
     check_full_rank(design_formula(opt[["design-formula"]], cd), cd)
     message("Covariates: ", paste(covariates, collapse = ", "))
 }
-comparisons <- data.frame(condition_1 = reference, condition_2 = others, stringsAsFactors = FALSE)
-message("Comparisons: ", paste(comparisons$condition_2, "vs", comparisons$condition_1, collapse = "; "))
+message("Comparisons: ", paste(others, "vs", reference, collapse = "; "))
+
+# IsoformSwitchAnalyzeR rewrites condition names that are not syntactic R names (makeProperNames), and
+# does so separately for the design and for the comparisons: with conditions 'ctrl-1' and '2.trt' the
+# design gets 'ctrl_1'/'2.trt' but the comparison 'ctrl_1'/'X2.trt', and the import fails. Such names
+# are replaced by R-safe labels (make.names, which IsoformSwitchAnalyzeR leaves unchanged) for the
+# analysis and restored in the result tables (switchlist.rds and switch_plots.pdf keep the labels).
+all_conds <- c(reference, others)
+safe_cond <- setNames(make.names(all_conds, unique = TRUE), all_conds)
+orig_cond <- setNames(all_conds, safe_cond)
+if (any(safe_cond != all_conds)) {
+    renamed <- safe_cond != all_conds
+    message("Condition names used inside IsoformSwitchAnalyzeR: ",
+            paste(sprintf("%s -> %s", all_conds[renamed], safe_cond[renamed]), collapse = ", "))
+}
+restore_conditions <- function(df) {
+    if (!is.data.frame(df)) return(df)
+    for (col in intersect(c("condition_1", "condition_2"), colnames(df))) {
+        v <- as.character(df[[col]])
+        hit <- v %in% names(orig_cond)
+        v[hit] <- orig_cond[v[hit]]
+        df[[col]] <- v
+    }
+    if ("Comparison" %in% colnames(df)) {          # "<condition_1> vs <condition_2>"
+        df$Comparison <- vapply(strsplit(as.character(df$Comparison), " vs ", fixed = TRUE), function(p) {
+            hit <- p %in% names(orig_cond)
+            p[hit] <- orig_cond[p[hit]]
+            paste(p, collapse = " vs ")
+        }, character(1))
+    }
+    df
+}
+comparisons <- data.frame(condition_1 = safe_cond[[reference]], condition_2 = unname(safe_cond[others]),
+                          stringsAsFactors = FALSE)
+
+# Covariate columns of designMatrix: categorical values as text, numeric covariates centred and scaled
+cov_df <- design[, covariates, drop = FALSE]
+for (v in intersect(covariates, numeric_covariates(opt[["numeric-covariates"]]))) {
+    cov_df[[v]] <- cd[design$sample, v]
+    # IsoformSwitchAnalyzeR's own rule (importRdata, isoformSwitchTestDEXSeq): a numeric column with at
+    # most half as many distinct values as samples is converted to a factor
+    if (length(unique(cov_df[[v]])) * 2 <= nrow(cov_df)) {
+        warning(sprintf(paste0("IsoformSwitchAnalyzeR models the numeric covariate '%s' as categorical: it has %d ",
+                               "distinct values for %d samples (numeric columns with at most half as many distinct ",
+                               "values as samples are converted to factors by IsoformSwitchAnalyzeR)"),
+                        v, length(unique(cov_df[[v]])), nrow(cov_df)))
+    }
+}
 
 counts_data <- counts_data[, c("isoform_id", design$sample)]
 abund_data  <- abund_data[,  c("isoform_id", design$sample)]
@@ -112,8 +159,8 @@ counts_data[, design$sample] <- round(counts_data[, design$sample])
 switchList <- importRdata(
     isoformCountMatrix   = counts_data,
     isoformRepExpression = abund_data,
-    designMatrix         = data.frame(sampleID = design$sample, condition = design$condition,
-                                      design[, covariates, drop = FALSE], stringsAsFactors = FALSE),
+    designMatrix         = data.frame(sampleID = design$sample, condition = unname(safe_cond[design$condition]),
+                                      cov_df, stringsAsFactors = FALSE),
     isoformExonAnnoation = opt$gtf,
     isoformNtFasta       = opt[["nt-fasta"]],
     comparisonsToMake    = comparisons,
@@ -122,7 +169,15 @@ switchList <- importRdata(
     detectUnwantedEffects = FALSE
 )
 switchList <- preFilter(switchList)
-switchList <- isoformSwitchTestDEXSeq(switchList, reduceToSwitchingGenes = FALSE)
+# The DEXSeq switch test can fail numerically on small data sets (e.g. the dispersion fit with very few
+# isoforms or residual degrees of freedom). The failure is reported instead of stopping the pipeline.
+switchList <- tryCatch(isoformSwitchTestDEXSeq(switchList, reduceToSwitchingGenes = FALSE), error = function(e) {
+    msg <- sprintf("Isoform switch analysis failed in isoformSwitchTestDEXSeq (DEXSeq): %s", conditionMessage(e))
+    message(msg)
+    write_message("isoform_switch_results.csv", msg)
+    write_message("significant_switches.csv", msg)
+    quit(save = "no", status = 0)
+})
 switchList <- analyzeAlternativeSplicing(switchList, onlySwitchingGenes = FALSE)
 
 as_analysis <- switchList$AlternativeSplicingAnalysis
@@ -186,10 +241,10 @@ if (!is.null(opt[["nt-fasta"]])) {
         error = function(e) { message("analyzeSwitchConsequences: ", conditionMessage(e)); switchList })
     cons <- switchList$switchConsequence
     if (!is.null(cons) && nrow(cons) > 0) {
-        write.csv(cons, "switch_consequences.csv", row.names = FALSE)
+        write.csv(restore_conditions(cons), "switch_consequences.csv", row.names = FALSE)
         summ <- extractConsequenceSummary(switchList, consequencesToAnalyze = "all", alpha = alpha, dIFcutoff = dif_cutoff,
                                           plot = FALSE, returnResult = TRUE)
-        write.csv(summ, "consequence_summary.csv", row.names = FALSE)
+        write.csv(restore_conditions(summ), "consequence_summary.csv", row.names = FALSE)
         pdf("consequence_summary.pdf", width = 10, height = 6)
         print(extractConsequenceSummary(switchList, consequencesToAnalyze = "all", alpha = alpha, dIFcutoff = dif_cutoff,
                                         plot = TRUE, returnResult = FALSE))
@@ -198,7 +253,7 @@ if (!is.null(opt[["nt-fasta"]])) {
                                                      dIFcutoff = dif_cutoff, plot = FALSE, returnResult = TRUE,
                                                      returnSummary = TRUE),
                         error = function(e) data.frame(Message = conditionMessage(e)))
-        write.csv(enr, "consequence_enrichment.csv", row.names = FALSE)
+        write.csv(restore_conditions(enr), "consequence_enrichment.csv", row.names = FALSE)
         pdf("consequence_enrichment.pdf", width = 10, height = 6)
         tryCatch(print(extractConsequenceEnrichment(switchList, consequencesToAnalyze = "all", alpha = alpha,
                                                     dIFcutoff = dif_cutoff, plot = TRUE, returnResult = FALSE)),
@@ -242,7 +297,7 @@ if (!is.null(opt[["nt-fasta"]])) {
 
 # ---- 4. Switch tables --------------------------------------------------------------------------
 saveRDS(switchList, "switchlist.rds")
-feat <- switchList$isoformFeatures
+feat <- restore_conditions(switchList$isoformFeatures)
 clean_id <- function(x) trimws(gsub('"', '', sub(".*:", "", as.character(x))))
 feat$iso_clean <- clean_id(feat$isoform_id)          # kept from v0.1.0
 # ORF source per isoform: annotated (reference CDS), predicted, or empty (no ORF / no sequences)

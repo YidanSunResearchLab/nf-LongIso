@@ -21,7 +21,8 @@ process MAKE_DESIGN {
     def quoted = lines.collect { r -> "'${r}'" }.join(' ')
     """
     printf '%s\\n' ${quoted} > design.csv
-    check_design.R --design=design.csv --design-formula='${params.design}' --reference=${reference}
+    check_design.R --design=design.csv --design-formula='${params.design}' \\
+        --numeric-covariates='${params.numeric_covariates ?: ''}' --reference=${reference}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

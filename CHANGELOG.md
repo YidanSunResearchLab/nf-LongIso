@@ -9,9 +9,11 @@ were found during the work on v0.2.0.
 
 ### Breaking changes
 
-- **Sample and condition names** must match `^[A-Za-z][A-Za-z0-9_]*$` (letters, digits, underscores;
-  start with a letter). Names with `.` or `-` were silently rewritten by R/DESeq2 in v0.1.0 and are now
-  rejected at start-up. A missing condition is an error (v0.1.0 silently used `control`) (issue 18).
+- **Sample and condition names** must match `^[A-Za-z0-9][A-Za-z0-9._-]*$` (letters, digits, `.`, `_`,
+  `-`; start with a letter or digit). Spaces, `/`, quotes and other characters, which v0.1.0 accepted
+  but which break file names and shell commands, are rejected at start-up. Names with `.`, `-` or a
+  leading digit, which R/DESeq2 rewrote in v0.1.0 (e.g. `1_ctrl` → `X1_ctrl`), are now kept exactly in
+  every table. A missing condition is an error (v0.1.0 silently used `control`) (issue 18).
 - **The samplesheet is validated against a schema** (`assets/schema_input.json`): required columns
   `sample`, `condition` and `fastq` or `bam`; unique sample names; files must exist (issue 18). All
   parameters are validated against `nextflow_schema.json`; invalid values (e.g. a misspelt
@@ -50,9 +52,11 @@ were found during the work on v0.2.0.
 ### Added
 
 - Parameter validation with the nf-schema plugin; `--help`, `--helpFull`, `--help <parameter>`;
-  parameter summary in the log (issue 20).
-- Samplesheet schema with explanatory error messages; warning for conditions with fewer than 2
-  replicates (issue 18).
+  parameter summary in the log (issue 20). Unknown parameters (e.g. a misspelt name) give a warning and
+  are ignored (`validation.logging.unrecognisedParams = 'warn'`, the nf-schema default, set explicitly).
+- Samplesheet schema with explanatory error messages (issue 18). Experiments without replicates run to
+  the end: a warning at start-up lists the tests that are skipped, and each skipped test writes a
+  `Message` instead of results.
 - `MINIMAP2_INDEX` (built once; `--minimap2_index` to reuse an `.mmi`, `--minimap2_index_args`) and
   `JUNC_BED` (built once) (issue 13).
 - `SAMTOOLS_STATS` (stats and flagstat) for both input types.
@@ -84,6 +88,9 @@ were found during the work on v0.2.0.
 - **Experimental design with covariates** (B5): `--design` (e.g. `'~ batch + condition'`) over samplesheet
   columns, used by DESeq2 (genes, transcripts, TEs), IsoformSwitchAnalyzeR and the DEXSeq usage tests;
   the design matrix is checked before alignment (confounded designs stop with the columns involved).
+  Covariates are categorical unless listed in `--numeric_covariates` (numeric values, centred and scaled
+  before fitting); an unlisted covariate with only numeric values and more than two levels gives a
+  warning.
 - **Isoform switch consequences** (B3): transcript sequences from the Bambu annotation (`GFFREAD`,
   gffread 0.12.7); ORFs from the CDS of `--gtf` for annotated transcripts (`addORFfromGTF`) and predicted
   for novel transcripts (`analyzeNovelIsoformORF`; all predicted when `--gtf` has no CDS), with the new
@@ -116,7 +123,8 @@ were found during the work on v0.2.0.
 - Junction TSV with motif and annotation, `--junction_min_mapq`, `SAMTOOLS_FAIDX` (genome index when no
   `.fai` exists) and `GTF_INTRONS` (A1).
 - `tests/apa_unit/` (internal priming on both strands and clustering); `tests/summarize_results.py` reads
-  the new `apa/` and `promoter_tss/` folders; CI stub run with `--run_sqanti3` and a design covariate, and
+  the new `apa/` and `promoter_tss/` folders; CI stub runs with `--run_sqanti3` and a design covariate, and with
+  relaxed names and a numeric covariate (`tests/samplesheet_test_names_numeric.csv`), and
   real Docker runs of the test profile with BAM input, a single condition and three conditions
   (`tests/samplesheet_test_single.csv`, `tests/samplesheet_test_3cond.csv`; manual dispatch);
   `docs/dev/review_v0.2.0_verification.md`, `docs/dev/apa_method_comparison.md`,
@@ -236,6 +244,20 @@ were found during the work on v0.2.0.
   (a transcript ID reused on another chromosome produced a false intron), without zero-length introns.
 - Design tables are read as text, so that values such as `T`, `F` or `NA` stay valid names.
 - DESeq2 `results()` uses `alpha = 0.05`, the cutoff used for significance.
+- proActiv: without replicates (fewer than 2 samples in the reference or in the other conditions),
+  `getAlternativePromoters()` was still called and wrote nothing; the test is now skipped and
+  `alternative_promoters.tsv` has a `Message`, as have a single condition and a failure of the test
+  (with the error text).
+- Names that are not syntactic in R (`.`/`-`/leading digit, allowed since the relaxed naming rule):
+  IsoformSwitchAnalyzeR cleans condition names separately in the design and in the comparisons
+  (`2.trt` stays `2.trt` in one and becomes `X2.trt` in the other), which made the import fail; it now
+  runs with `make.names` labels and the result tables get the original names back. proActiv also
+  rewrites condition names (so `getAlternativePromoters()` did not find a reference such as `ctrl-1`)
+  and sample columns; it gets the same labels, and its tables use the original names. The SUPPA2
+  `.psivec`/`.dpsi` headers, which SUPPA2 cuts at the first `.` of the condition name, are rewritten
+  with the full names.
+- A numerical failure of IsoformSwitchAnalyzeR's DEXSeq switch test (e.g. the dispersion fit on very
+  small data) no longer stops the pipeline; the switch tables contain a `Message` with the error.
 - `bambu/versions.yml` was published by two processes; only the declared result files are published.
 
 ## [0.1.0] - 2026-08-03

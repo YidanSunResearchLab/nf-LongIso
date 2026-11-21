@@ -26,6 +26,7 @@ process DESEQ2 {
         --counts=${counts} \\
         --design=${design} \\
         --design-formula='${params.design}' \\
+        --numeric-covariates='${params.numeric_covariates ?: ''}' \\
         --level=${level} \\
         --reference=${reference}
 
@@ -71,6 +72,7 @@ process TE_DESEQ2 {
         --gene-counts=${gene_counts} \\
         --design=${design} \\
         --design-formula='${params.design}' \\
+        --numeric-covariates='${params.numeric_covariates ?: ''}' \\
         --type=${type} \\
         --reference=${reference}
 

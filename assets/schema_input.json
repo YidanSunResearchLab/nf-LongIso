@@ -2,7 +2,7 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://raw.githubusercontent.com/YidanSunResearchLab/nf-LongIso/main/assets/schema_input.json",
     "title": "NextLongIso samplesheet",
-    "description": "Schema for the file provided with --samplesheet. Columns: sample,condition and either fastq (--input_type fastq) or bam (--input_type bam). Additional columns are allowed and can be used as covariates in --design (categorical values following the sample-name rules).",
+    "description": "Schema for the file provided with --samplesheet. Columns: sample,condition and either fastq (--input_type fastq) or bam (--input_type bam). Additional columns are allowed and can be used as covariates in --design (categorical values following the sample-name rules, or numbers for the columns listed in --numeric_covariates).",
     "type": "array",
     "uniqueEntries": [
         "sample"
@@ -12,16 +12,16 @@
         "properties": {
             "sample": {
                 "type": "string",
-                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
-                "errorMessage": "Sample names are required, must be unique, must start with a letter and may contain only letters, digits and underscores (regex ^[A-Za-z][A-Za-z0-9_]*$). Characters such as '.' or '-' are not allowed because R and DESeq2 rewrite such names, which breaks the matching between count tables and the samplesheet.",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                "errorMessage": "Sample names are required, must be unique, must start with a letter or digit and may contain only letters, digits, '.', '_' and '-' (regex ^[A-Za-z0-9][A-Za-z0-9._-]*$). Spaces, '/', quotes and other characters are not allowed because sample names are used in file names and shell commands.",
                 "meta": [
                     "id"
                 ]
             },
             "condition": {
                 "type": "string",
-                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
-                "errorMessage": "Condition is required for every sample, must start with a letter and may contain only letters, digits and underscores (regex ^[A-Za-z][A-Za-z0-9_]*$). Characters such as '.' or '-' are not allowed because R and DESeq2 rewrite such names.",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                "errorMessage": "Condition is required for every sample, must start with a letter or digit and may contain only letters, digits, '.', '_' and '-' (regex ^[A-Za-z0-9][A-Za-z0-9._-]*$). Spaces, '/', quotes and other characters are not allowed because condition names are used in file names and shell commands.",
                 "meta": [
                     "condition"
                 ]

@@ -108,7 +108,7 @@ Understanding the Flags:  \
 **--samplesheet**: CSV file listing the samples (see **Samplesheet** below)  \
 **--outdir**: Output directory (default `results`)
 
-Run `nextflow run main.nf --help` for the main options, `--helpFull` for all of them, and `--help <parameter>` for details on one parameter. Execution reports (resource usage, timeline, trace, DAG) are always written to `<outdir>/pipeline_info/`.
+Run `nextflow run main.nf --help` for the main options, `--helpFull` for all of them, and `--help <parameter>` for details on one parameter. Parameter values are validated before the run starts (an invalid value, e.g. `--input_type fasta`, stops it). An unknown parameter, e.g. a misspelt `--minimap_preset`, only produces a warning (`The following invalid input values have been detected`) and is ignored, so check the start of the log for that warning. Execution reports (resource usage, timeline, trace, DAG) are always written to `<outdir>/pipeline_info/`.
 
 **Note**: During the first run, the pipeline will download required containers, which may take some time depending on your internet connection. We recommend using the -resume flag for all future executions, it intelligently tracks progress and reuses successful results, drastically reducing runtime.
 
@@ -167,9 +167,9 @@ H1_rep2,demo/H1_demo_rep2.fastq.gz,treatment
 ```
 
 Rules (checked before the run starts):
-* `sample` and `condition` must start with a letter and contain only letters, digits and underscores (`^[A-Za-z][A-Za-z0-9_]*$`). Dots and hyphens are not allowed because R and DESeq2 silently rewrite such names, which breaks the matching between count tables and samples.
+* `sample` and `condition` may contain letters, digits, `.`, `_` and `-` and must start with a letter or digit (`^[A-Za-z0-9][A-Za-z0-9._-]*$`, e.g. `H1.rep-1`, `1_ctrl`). Spaces, `/`, quotes and other characters are rejected because the names are used in file names and shell commands. Names are kept exactly as written in every result table (no R name rewriting such as `1_ctrl` → `X1_ctrl`). IsoformSwitchAnalyzeR and proActiv cannot use such condition names internally: they run with R-safe labels (`make.names`, e.g. `2.trt` → `X2.trt`) and the result tables get the original names back; only `switchlist.rds` and the gene plots in `switch_plots.pdf` show the labels.
 * Sample names must be unique, and every input file must exist. Relative paths are resolved from the directory where you start Nextflow.
-* Conditions with fewer than 2 replicates produce a warning; isoform-switch testing, SUPPA2 diffSplice and the DEXSeq usage tests (APA, `tss` promoters) skip them. Without replicates at all (e.g. one sample per condition), DESeq2 cannot estimate dispersions: the DE tables then contain a `Message` column instead of results, and the rest of the pipeline still runs.
+* **Experiments without replicates are allowed.** Conditions with a single sample produce a warning at start-up, and the statistical tests that need replicates skip them instead of stopping the run: isoform-switch testing, SUPPA2 diffSplice and the DEXSeq usage tests (APA, `tss` promoters) leave such a condition out (all comparisons if it is the reference), and proActiv's alternative-promoter test needs ≥ 2 samples in the reference and ≥ 2 in the other conditions. Without replicates at all (e.g. one sample per condition), DESeq2 cannot estimate dispersions either. Skipped tests write a results file with a `Message` column explaining why; alignment, quantification, normalised counts, PSI values, TE and junction annotation and QC are produced as usual.
 * **Reference condition:** all comparisons are made against `--reference_condition`. If it is not set, `control` is used when present, otherwise the alphabetically first condition. The log shows which one was used.
 * **BAM input** (`--input_type bam`): BAMs must be coordinate-sorted. A BAM index (`<file>.bam.bai` or `<file>.bai`) is used when present and created otherwise. Each BAM is renamed to `<sample>.sorted.bam` inside the pipeline, so all result tables use the sample names. Alignment statistics, junctions and bigWigs are produced exactly as for FASTQ input. `--genome` is still required (Bambu uses it).
 
@@ -190,6 +190,7 @@ Extra options are **appended after** the pipeline's own options, so you can add 
 | `--suppa2_diff_args` | `-m empirical -gc` | SUPPA2 diffSplice | See **Differential splicing (SUPPA2)** |
 | `--sqanti3_args` | *(empty)* | SQANTI3 QC | Extra `sqanti3_qc.py` options (see **SQANTI3**) |
 | `--design` | `~ condition` | all differential analyses | Design formula over samplesheet columns (see **Experimental design and covariates**) |
+| `--numeric_covariates` | *(none)* | all differential analyses | Covariates of `--design` that are numeric, e.g. `age,rin` (see **Experimental design and covariates**) |
 | `--reference_condition` | *(auto)* | all differential analyses | Reference group (see Samplesheet) |
 | `--isoswitch_alpha` | `0.05` | IsoformSwitchAnalyzeR | q-value cutoff for isoform switches |
 | `--isoswitch_dif_cutoff` | `0.1` | IsoformSwitchAnalyzeR | Minimum \|dIF\| for `significant_switches.csv` |
@@ -257,10 +258,11 @@ H1_rep2,reads/H1_rep2.fastq.gz,treatment,b2
 nextflow run main.nf -profile singularity --samplesheet samplesheet.csv --design '~ batch + condition' ...
 ```
 
-* Covariates are categorical (factors). Their values follow the naming rule of conditions, and a column with a single value is rejected.
+* Covariates are categorical (factors) by default; their values follow the naming rule of conditions (so a batch coded `1`, `2`, `3` is a valid categorical covariate). Covariates listed in `--numeric_covariates` (e.g. `--design '~ age + condition' --numeric_covariates age`) must have numeric values; they are centred and scaled to unit standard deviation (as recommended by DESeq2 for model convergence) and enter the model as linear terms. A covariate that is not listed but has only numeric values and more than two levels is modelled as categorical, with a warning. A column with a single value is rejected.
 * The design matrix is checked before alignment starts: a confounded design (e.g. every `treatment` sample in one batch) stops the run with a message naming the samplesheet columns involved. A design of full rank that leaves no residual degrees of freedom (e.g. 4 samples with 2 conditions and a 3-level batch) is not stopped, but its differential tests write a `Message` instead of results.
 * DESeq2 and IsoformSwitchAnalyzeR use the formula as given (IsoformSwitchAnalyzeR's automatic surrogate-variable detection, `detectUnwantedEffects`, is switched off so that its model matches DESeq2). The DEXSeq usage tests use `~ sample + exon + <covariate>:exon + condition:exon` against `~ sample + exon + <covariate>:exon`, separately for each condition vs the reference; a comparison whose design cannot be fitted is skipped with a warning.
 * SUPPA2 diffSplice and proActiv's `getAlternativePromoters()` do not model covariates; a warning is printed when covariates are set.
+* IsoformSwitchAnalyzeR converts a numeric covariate with at most half as many distinct values as samples (e.g. ages 30, 30, 45, 45) into a factor (its own rule); a warning is printed in that case.
 
 🔗 **Junctions**
 
@@ -296,7 +298,7 @@ SUPPA2 generates splicing events from the Bambu annotation and computes PSI per 
 
 **Multiple testing.** The p-values reported by diffSplice are, with `-gc`, corrected within each gene only, which does not control the false discovery rate over all genes. The pipeline therefore adds `padj`: Benjamini-Hochberg over all events with a p-value in the comparison.
 
-Outputs (`suppa2/diffsplice/`): `<condition>_vs_<reference>.dpsi` (ΔPSI = condition − reference, p-value as reported by SUPPA2) and `.psivec` (PSI of each replicate; SUPPA2 names the columns `<condition>_1`, `<condition>_2`, ... in samplesheet order, not by sample name); `suppa2_diffsplice_results.tsv` (all comparisons, every event with a p-value: comparison, event type, event, gene, dPSI, pvalue, padj) and `suppa2_diffsplice_significant.tsv` (padj < `--suppa2_alpha` 0.05 and |ΔPSI| > `--suppa2_dpsi_cutoff` 0.1). With few replicates the empirical method can report p = 0 for events with ΔPSI near 0; the |ΔPSI| cutoff removes them from the significant table.
+Outputs (`suppa2/diffsplice/`): `<condition>_vs_<reference>.dpsi` (ΔPSI = condition − reference, p-value as reported by SUPPA2) and `.psivec` (PSI of each replicate; the columns are named `<condition>_1`, `<condition>_2`, ... in the column order of the Bambu count tables, not by sample name); `suppa2_diffsplice_results.tsv` (all comparisons, every event with a p-value: comparison, event type, event, gene, dPSI, pvalue, padj) and `suppa2_diffsplice_significant.tsv` (padj < `--suppa2_alpha` 0.05 and |ΔPSI| > `--suppa2_dpsi_cutoff` 0.1). With few replicates the empirical method can report p = 0 for events with ΔPSI near 0; the |ΔPSI| cutoff removes them from the significant table.
 
 📊 **Read QC**
 
@@ -361,7 +363,7 @@ After a successful run, NextLongIso generates the following output directories a
 | **multiqc/**   | `multiqc_report.html`, `multiqc_report_data/` | Read QC, alignment statistics, numbers of differentially expressed genes/transcripts and software versions. |
 | **pipeline_info/** | `execution_report_*.html`, `execution_timeline_*.html`, `execution_trace_*.txt`, `pipeline_dag_*.html`, `software_versions.yml` | Resource usage, run timeline, task trace, workflow graph and the exact version of every tool. |
 
-**Note**: Some output files (e.g. proActiv's `alternative_promoters.tsv`, `atss_results.csv`, `atts_results.csv`) are only written when the corresponding events are detected. When a differential analysis cannot be run (a single condition, no replicates, no testable feature, or no TE read), its results file contains a `Message` column explaining why.
+**Note**: Some output files (e.g. `atss_results.csv`, `atts_results.csv`) are only written when the corresponding events are detected; proActiv's `alternative_promoters.tsv` is not written when the test ran and found no alternative promoter. When a differential analysis cannot be run (a single condition, no replicates, no testable feature, or no TE read), its results file contains a `Message` column explaining why.
 
 💡 **Troubleshooting**
 
@@ -385,7 +387,7 @@ We also welcome community contributions. Users are encouraged to:
 * Suggest new features
 * Contribute improvements through **Pull Requests**
 
-Changes between versions are listed in [CHANGELOG.md](CHANGELOG.md). Continuous integration (`.github/workflows/ci.yml`) checks the parameter schemas, lints the code, runs unit tests of the TE and APA analyses and stub runs of the test profile (default settings, and with `--run_sqanti3` and a design covariate) on every push and pull request; real runs of the test profile with Docker (FASTQ input, BAM input, a single condition and three conditions) are started manually (workflow dispatch).
+Changes between versions are listed in [CHANGELOG.md](CHANGELOG.md). Continuous integration (`.github/workflows/ci.yml`) checks the parameter schemas, lints the code, runs unit tests of the TE and APA analyses and stub runs of the test profile (default settings; with `--run_sqanti3` and a design covariate; with sample/condition names containing `.`, `-` and a leading digit and a numeric covariate) on every push and pull request; real runs of the test profile with Docker (FASTQ input, BAM input, a single condition and three conditions) are started manually (workflow dispatch).
 
 While we aim to maintain long-term support for NextLongIso, development priorities may evolve as the software and research needs grow.
 

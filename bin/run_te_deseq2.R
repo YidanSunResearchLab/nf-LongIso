@@ -8,6 +8,7 @@
 # Usage:
 #   run_te_deseq2.R --te-counts=TE_family_counts.tsv --gene-counts=counts_gene.txt \
 #               --design=design.csv --design-formula="~ condition" --type=Family --reference=control
+#               [--numeric-covariates=age,rin]   (covariates of the design that are numeric)
 #
 # Outputs (<type> = Family or Instance)
 #   DE_TE_<type>_results.csv                  (exactly 2 conditions)
@@ -59,7 +60,7 @@ te_mat   <- round(as.matrix(te_mat[, design$sample, drop = FALSE]))
 gene_mat <- round(as.matrix(gene_mat[, design$sample, drop = FALSE]))
 
 reference  <- opt$reference
-coldata    <- design_coldata(design, opt[["design-formula"]], reference)
+coldata    <- design_coldata(design, opt[["design-formula"]], reference, numeric_covariates(opt[["numeric-covariates"]]))
 conditions <- levels(coldata$condition)
 formula    <- design_formula(opt[["design-formula"]], coldata)
 check_full_rank(formula, coldata)

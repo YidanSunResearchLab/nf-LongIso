@@ -25,7 +25,7 @@
                     "mimetype": "text/csv",
                     "pattern": "^\\S+\\.csv$",
                     "description": "Samplesheet CSV with columns sample,condition and fastq (or bam for --input_type bam).",
-                    "help_text": "Sample and condition names must match ^[A-Za-z][A-Za-z0-9_]*$ (letters, digits and underscores, starting with a letter). See the Samplesheet section of the README.",
+                    "help_text": "Sample and condition names may contain letters, digits, '.', '_' and '-' and must start with a letter or digit (regex ^[A-Za-z0-9][A-Za-z0-9._-]*$). See the Samplesheet section of the README.",
                     "fa_icon": "fas fa-file-csv"
                 },
                 "input_type": {
@@ -176,12 +176,20 @@
                     "fa_icon": "fas fa-project-diagram",
                     "pattern": "^~\\s*([A-Za-z][A-Za-z0-9_]*\\s*\\+\\s*)*condition\\s*$",
                     "description": "Design formula over samplesheet columns, with condition as the last term (e.g. '~ batch + condition').",
-                    "help_text": "Covariates are extra samplesheet columns with categorical values (same naming rules as sample names). Used by DESeq2 (genes, transcripts, TEs), IsoformSwitchAnalyzeR and the DEXSeq usage tests (APA, promoters). SUPPA2 diffSplice cannot use covariates.",
+                    "help_text": "Covariates are extra samplesheet columns. They are categorical (values follow the naming rules of sample names) unless listed in --numeric_covariates. Used by DESeq2 (genes, transcripts, TEs), IsoformSwitchAnalyzeR and the DEXSeq usage tests (APA, promoters). SUPPA2 diffSplice cannot use covariates.",
                     "errorMessage": "--design must look like '~ condition' or '~ batch + condition' (samplesheet columns joined by '+', condition last)"
+                },
+                "numeric_covariates": {
+                    "type": "string",
+                    "pattern": "^\\s*[A-Za-z][A-Za-z0-9_]*(\\s*,\\s*[A-Za-z][A-Za-z0-9_]*)*\\s*$",
+                    "fa_icon": "fas fa-ruler",
+                    "description": "Covariates of --design that are numeric (comma-separated, e.g. 'age,rin'); all other covariates are categorical.",
+                    "help_text": "Values must be numbers. Numeric covariates are centred and scaled to unit standard deviation before model fitting (recommended by DESeq2 for GLM convergence) and enter the model as linear terms. A batch coded as 1, 2, 3 should not be listed here: it is a categorical covariate.",
+                    "errorMessage": "--numeric_covariates must be a comma-separated list of samplesheet column names"
                 },
                 "reference_condition": {
                     "type": "string",
-                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
                     "fa_icon": "fas fa-flag",
                     "description": "Reference condition. Default: 'control' if present, otherwise the alphabetically first condition.",
                     "help_text": "Every other condition is compared with the reference; fold changes, dIF and dPAU are <condition> relative to the reference."

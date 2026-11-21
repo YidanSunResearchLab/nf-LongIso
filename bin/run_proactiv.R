@@ -82,10 +82,14 @@ unknown <- setdiff(sample_names, design$sample)
 if (length(unknown) > 0) stop(sprintf("Junction tables without a samplesheet entry: %s", paste(unknown, collapse = ", ")))
 conditions <- design$condition[match(sample_names, design$sample)]
 print(data.frame(Sample = sample_names, Condition = conditions))
+# proActiv applies make.names() to the conditions (e.g. 'ctrl-1' -> 'ctrl.1'), so a reference such as
+# 'ctrl-1' would not be found and two conditions could merge ('a-b', 'a.b'): proActiv gets unique R-safe
+# labels and the output columns get the original names back
+safe_cond <- setNames(make.names(unique(conditions), unique = TRUE), unique(conditions))
 
 # ---- 4. proActiv -------------------------------------------------------------------------------
 result <- proActiv(files = junc_files, promoterAnnotation = promoter_annot,
-                   condition = conditions, ncores = as.integer(opt$cpus))
+                   condition = unname(safe_cond[conditions]), ncores = as.integer(opt$cpus))
 
 pos_info <- as.data.frame(rowData(result))
 for (col in names(which(sapply(pos_info, is.list)))) {
@@ -93,19 +97,47 @@ for (col in names(which(sapply(pos_info, is.list)))) {
         if (is.null(x) || length(x) == 0) NA_character_ else paste(x, collapse = ",")
     })
 }
+# Column names with the samplesheet names: '<label>.mean' -> '<condition>.mean'; sample columns, which
+# proActiv builds with make.names() ('1_a' -> 'X1_a.SJ.out'), -> '<sample>.SJ.out'
+for (cond in names(safe_cond)) {
+    for (suffix in c(".mean", ".gene.mean", ".class")) {
+        colnames(pos_info)[colnames(pos_info) == paste0(safe_cond[[cond]], suffix)] <- paste0(cond, suffix)
+    }
+}
+sample_columns <- paste0(sample_names, ".SJ.out")
+with_samples <- function(m) {
+    m <- as.matrix(m)
+    if (ncol(m) != length(sample_columns) || !all(colnames(m) %in% c(sample_columns, make.names(sample_columns))) ||
+        !all(make.names(colnames(m)) == make.names(sample_columns))) {
+        stop(sprintf("Unexpected proActiv sample columns: %s", paste(colnames(m), collapse = ", ")))
+    }
+    colnames(m) <- sample_columns
+    data.frame(pos_info, m, check.names = FALSE, stringsAsFactors = FALSE)
+}
 assay_list <- assays(result)
-write.table(cbind(pos_info, as.data.frame(assay_list[["absolutePromoterActivity"]])),
+write.table(with_samples(assay_list[["absolutePromoterActivity"]]),
             "promoter_activity.tsv", sep = "\t", quote = FALSE, row.names = FALSE)
-write.table(cbind(pos_info, as.data.frame(assay_list[["promoterCounts"]])),
+write.table(with_samples(assay_list[["promoterCounts"]]),
             "promoter_counts.tsv", sep = "\t", quote = FALSE, row.names = FALSE)
 
 # ---- 5. Alternative promoters --------------------------------------------------------------------
-if (length(unique(conditions)) < 2) {
-    message("Only one condition - skipping alternative promoter detection")
+# When the test is not run, alternative_promoters.tsv has a single 'Message' column giving the reason.
+skip_altprom <- function(msg) {
+    message(msg)
+    write.table(data.frame(Message = msg), "alternative_promoters.tsv", sep = "\t", quote = FALSE, row.names = FALSE)
     quit(save = "no", status = 0)
 }
+if (length(unique(conditions)) < 2) skip_altprom("Alternative promoters not tested: only one condition")
 reference <- opt$reference
 if (!reference %in% conditions) stop(sprintf("Reference condition '%s' not found among samples", reference))
+# getAlternativePromoters() compares the reference with all other samples pooled (limma); without
+# replicates on either side there is no residual variance to test against
+n_ref   <- sum(conditions == reference)
+n_other <- sum(conditions != reference)
+if (n_ref < 2 || n_other < 2) {
+    skip_altprom(sprintf("Alternative promoters not tested: needs >= 2 samples in the reference condition and >= 2 in the other conditions (%s: %d, other: %d)",
+                         reference, n_ref, n_other))
+}
 
 arg_text <- trimws(paste(readLines(opt[["altprom-args-file"]], warn = FALSE), collapse = " "))
 extra    <- if (nzchar(arg_text)) eval(parse(text = sprintf("list(%s)", arg_text))) else list()
@@ -116,9 +148,9 @@ message(sprintf("Running getAlternativePromoters (reference: %s; %s)", reference
 # As in v0.1.0, an internal failure of getAlternativePromoters (e.g. too little data) is
 # reported but does not fail the pipeline; invalid user arguments fail above.
 alt <- tryCatch(
-    do.call(getAlternativePromoters, c(list(result = result, referenceCondition = reference), extra)),
-    error = function(e) { message("getAlternativePromoters failed: ", conditionMessage(e)); NULL })
-if (is.null(alt)) quit(save = "no", status = 0)
+    do.call(getAlternativePromoters, c(list(result = result, referenceCondition = safe_cond[[reference]]), extra)),
+    error = function(e) conditionMessage(e))
+if (is.character(alt)) skip_altprom(paste("Alternative promoters not tested: getAlternativePromoters failed:", alt[1]))
 up   <- alt$upReg
 down <- alt$downReg
 message(sprintf("Alternative promoters up in %s: %d; down in %s: %d", reference, nrow(up), reference, nrow(down)))

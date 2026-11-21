@@ -139,8 +139,8 @@ process SAMTOOLS_INDEX {
 
     script:
     """
-    samtools view -H ${bam} > header.sam
-    if ! grep -q '^@HD.*SO:coordinate' header.sam; then
+    samtools view -H ${bam} > header.txt
+    if ! grep -q '^@HD.*SO:coordinate' header.txt; then
         echo "ERROR: BAM for sample '${meta.id}' (${bam.name}) is not coordinate-sorted (no SO:coordinate in the @HD line). Sort it with 'samtools sort' first." >&2
         exit 1
     fi

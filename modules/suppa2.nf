@@ -122,6 +122,15 @@ process SUPPA2_DIFFSPLICE {
                 -p "split/${reference}/${reference}.psi" "split/\$cond/\$cond.psi" \\
                 -e "split/${reference}/expression.tpm" "split/\$cond/expression.tpm" \\
                 -o "\$prefix"
+            # SUPPA2 names the columns after the PSI file names up to the first '.', which truncates
+            # condition names containing '.' (e.g. '2.trt' -> '2_1'): write the full names
+            n_ref=\$(head -n 1 "split/${reference}/${reference}.psi" | awk -F '\t' '{ print NF }')
+            awk -v ref='${reference}' -v cond="\$cond" -v nref="\$n_ref" 'BEGIN { FS = OFS = "\t" }
+                NR == 1 { for (i = 1; i <= NF; i++) \$i = (i <= nref ? ref "_" i : cond "_" (i - nref)) } { print }' \\
+                "\$prefix.psivec" > psivec.tmp && mv psivec.tmp "\$prefix.psivec"
+            awk -v ref='${reference}' -v cond="\$cond" 'BEGIN { FS = OFS = "\t" }
+                NR == 1 { \$1 = ref "-" cond "_dPSI"; \$2 = ref "-" cond "_p-val" } { print }' \\
+                "\$prefix.dpsi" > dpsi.tmp && mv dpsi.tmp "\$prefix.dpsi"
             dpsi_args="\$dpsi_args \$prefix=\$prefix.dpsi"
         done
     else

@@ -47,6 +47,7 @@ process APA {
         --counts=pas_counts.tsv \\
         --design=${design} \\
         --design-formula='${params.design}' \\
+        --numeric-covariates='${params.numeric_covariates ?: ''}' \\
         --reference=${reference} \\
         --min-count=${params.apa_min_count} \\
         --prefix=apa \\

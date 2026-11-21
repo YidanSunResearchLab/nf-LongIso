@@ -37,6 +37,7 @@ process ISOSWITCH {
         --gtf=${iso_gtf} \\
         --design=${design} \\
         --design-formula='${params.design}' \\
+        --numeric-covariates='${params.numeric_covariates ?: ''}' \\
         --reference=${reference} \\
         --alpha=${params.isoswitch_alpha} \\
         --dif-cutoff=${params.isoswitch_dif_cutoff} ${consequences}

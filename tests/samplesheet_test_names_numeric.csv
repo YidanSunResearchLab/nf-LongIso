@@ -1,0 +1,5 @@
+sample,fastq,condition,rin
+GM12878.rep-1,https://zenodo.org/records/21074209/files/GM12878_rep1.fastq.gz,ctrl-1,7.2
+1_GM12878.rep2,https://zenodo.org/records/21074209/files/GM12878_rep2.fastq.gz,ctrl-1,8.9
+H1-rep.1,https://zenodo.org/records/21074209/files/H1_rep1.fastq.gz,2.trt,6.5
+H1_rep2.x,https://zenodo.org/records/21074209/files/H1_rep2.fastq.gz,2.trt,9.4

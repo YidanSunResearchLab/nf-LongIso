@@ -12,6 +12,7 @@
 #   --design-formula  e.g. "~ batch + condition"; the DEXSeq models are
 #                full    ~ sample + exon + <covariate>:exon + condition:exon
 #                reduced ~ sample + exon + <covariate>:exon
+#   --numeric-covariates  optional: covariates of the design that are numeric (comma-separated)
 #   --min-count  features with fewer reads over all samples are removed; then genes with < 2
 #                features are removed
 #   --usage-label  name of the usage measure in the output columns (default 'usage'; 'PAU' for APA)
@@ -106,8 +107,8 @@ for (cond in others) {
     }
     smp <- design$sample[design$condition %in% c(reference, cond)]
     sd  <- design[match(smp, design$sample), , drop = FALSE]
-    cd  <- design_coldata(sd, opt[["design-formula"]], reference)
-    covs <- covariates[vapply(covariates, function(v) nlevels(droplevels(cd[[v]])) > 1, logical(1))]
+    cd  <- design_coldata(sd, opt[["design-formula"]], reference, numeric_covariates(opt[["numeric-covariates"]]))
+    covs <- covariates[vapply(covariates, function(v) n_distinct(cd[[v]]) > 1, logical(1))]
     if (length(covs) < length(covariates)) {
         warning(sprintf("%s vs %s: covariate(s) %s constant within this comparison and dropped",
                         cond, reference, paste(setdiff(covariates, covs), collapse = ", ")))

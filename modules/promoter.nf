@@ -48,6 +48,7 @@ process PROMOTER_TSS {
         --counts=promoter_counts.tsv \\
         --design=${design} \\
         --design-formula='${params.design}' \\
+        --numeric-covariates='${params.numeric_covariates ?: ''}' \\
         --reference=${reference} \\
         --min-count=${params.promoter_min_count} \\
         --prefix=promoter \\
