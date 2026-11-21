@@ -5,7 +5,7 @@ Issue numbers refer to the v0.2.0 review list (issues 1-22). A1-A4, B1-B5 and C 
 methodological review of v0.2.0 (`docs/dev/review_v0.2.0_verification.md`); changes without a label
 were found during the work on v0.2.0.
 
-## [0.2.0] - 2026-11-20
+## [0.2.0] - 2026-11-21
 
 ### Breaking changes
 
