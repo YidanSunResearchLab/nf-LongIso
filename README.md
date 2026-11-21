@@ -60,7 +60,7 @@ nextflow run YidanSunResearchLab/nf-LongIso -r v0.2.0 -profile test,singularity 
 nextflow run /path/to/nf-LongIso/main.nf -profile test,singularity --outdir results_test
 ```
 
-The test data (record https://zenodo.org/records/21074209) are cut from the demo run by `tests/make_test_data.sh`; they are not stored in the repository.
+The test data (Zenodo record https://doi.org/10.5281/zenodo.24420794) are cut from the demo run by `tests/make_test_data.sh`; they are not stored in the repository.
 
 🚀 **Quick Start for demo test**
 

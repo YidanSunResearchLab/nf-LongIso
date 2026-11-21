@@ -18,7 +18,7 @@
 # <demo_bam_dir> must contain {GM12878,H1}_demo_rep{1,2}.sorted.bam (+ .bai), i.e. the
 # results/minimap2/ directory of a demo run.
 #
-# The published copy of this dataset is on Zenodo (see conf/test.config); its files are genome.fa,
+# The published copy of this dataset is Zenodo record https://doi.org/10.5281/zenodo.24420794 (used by conf/test.config); its files are genome.fa,
 # genes.gtf, te.gtf and reads/*.fastq.gz from <outdir> (uploaded without the reads/ folder). The
 # samplesheet written here uses local paths (tests/data/...); tests/samplesheet_test.csv uses the URLs.
 # <outdir> = tests/data is git-ignored.

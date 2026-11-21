@@ -1,5 +1,5 @@
 sample,fastq,condition,batch
-GM12878_rep1,https://zenodo.org/records/21074209/files/GM12878_rep1.fastq.gz,control,b1
-GM12878_rep2,https://zenodo.org/records/21074209/files/GM12878_rep2.fastq.gz,control,b2
-H1_rep1,https://zenodo.org/records/21074209/files/H1_rep1.fastq.gz,treatment,b1
-H1_rep2,https://zenodo.org/records/21074209/files/H1_rep2.fastq.gz,treatment,b2
+GM12878_rep1,https://zenodo.org/records/24420794/files/GM12878_rep1.fastq.gz,control,b1
+GM12878_rep2,https://zenodo.org/records/24420794/files/GM12878_rep2.fastq.gz,control,b2
+H1_rep1,https://zenodo.org/records/24420794/files/H1_rep1.fastq.gz,treatment,b1
+H1_rep2,https://zenodo.org/records/24420794/files/H1_rep2.fastq.gz,treatment,b2
