@@ -87,7 +87,7 @@ wget -O TEtranscript_hg38_rmsk_TE.gtf "https://zenodo.org/records/21074209/files
 Navigate to the project directory and execute the pipeline using the command below. Note that the file paths are relative to the project root; ensure your reference files are correctly placed in the **data/genome/** directory.
 
 ```bash
-cd nf-LongIso
+cd ../..    # back to the nf-LongIso directory
 
 nextflow run main.nf \
   -profile singularity \

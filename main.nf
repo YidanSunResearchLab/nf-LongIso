@@ -108,6 +108,11 @@ def readSamplesheet(samplesheet, input_type, covariates, numeric) {
  * requirements and writes a 'Message' instead of results when it cannot be run.
  */
 def warnReplicates(n_reps, reference) {
+    if (n_reps.size() < 2) {
+        log.warn "Only one condition (${n_reps.keySet().join('')}): differential analyses are skipped (their result files contain " +
+                 "a 'Message' column). Alignment, quantification, PSI values, TE and junction annotation and QC are still produced."
+        return
+    }
     def unreplicated = n_reps.findAll { c, n -> n < 2 }.keySet().sort()
     if (!unreplicated) return
     if (unreplicated.size() == n_reps.size()) {
