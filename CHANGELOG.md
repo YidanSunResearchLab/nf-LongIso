@@ -5,6 +5,16 @@ Issue numbers refer to the v0.2.0 review list (issues 1-22). A1-A4, B1-B5 and C 
 methodological review of v0.2.0 (`docs/dev/review_v0.2.0_verification.md`); changes without a label
 were found during the work on v0.2.0.
 
+## [Unreleased]
+
+### Added
+
+- `tests/fetch_test_data.sh` downloads the test dataset from Zenodo with retries, checks it against
+  `tests/test_data.md5` and writes `local.config` and local copies of the test samplesheets. CI uses it
+  in both jobs: Zenodo rate-limits shared runner IPs, and the first push of v0.2.0 failed in the
+  parameter validation because one refused request was reported as "the file or directory ... does not
+  exist". The README explains the same fallback for users.
+
 ## [0.2.0] - 2026-11-21
 
 ### Breaking changes

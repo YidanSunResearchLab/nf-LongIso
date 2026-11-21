@@ -62,6 +62,14 @@ nextflow run /path/to/nf-LongIso/main.nf -profile test,singularity --outdir resu
 
 The test data (Zenodo record https://doi.org/10.5281/zenodo.24420794) are cut from the demo run by `tests/make_test_data.sh`; they are not stored in the repository.
 
+If the check stops with `the file or directory 'https://zenodo.org/...' does not exist`, Zenodo refused the request (it limits the request rate per IP address, which affects shared or institutional networks); the files are there. Download them once with retries and run on the local copy:
+
+```bash
+git clone https://github.com/YidanSunResearchLab/nf-LongIso.git     # the script was added after v0.2.0
+sh nf-LongIso/tests/fetch_test_data.sh test_data                       # checks the md5 sums in tests/test_data.md5
+nextflow run YidanSunResearchLab/nf-LongIso -r v0.2.0 -profile test,singularity -c test_data/local.config --outdir results_test
+```
+
 🚀 **Quick Start for demo test**
 
 **1. Prepare Reference Files (GRCh38/hg38 as example)**

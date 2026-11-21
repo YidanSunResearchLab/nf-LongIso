@@ -31,6 +31,7 @@ data/genome/*.bed
 
 # Test data (hosted on Zenodo; regenerate locally with tests/make_test_data.sh)
 tests/data/
+test_data/
 
 # OS files
 .DS_Store

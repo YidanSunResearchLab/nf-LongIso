@@ -3,6 +3,9 @@ name: CI
 # push / pull_request: schema checks, lint, TE and APA unit tests and stub runs of the test profile
 # workflow_dispatch:   real runs of the test profile with Docker (tiny dataset on Zenodo): FASTQ input,
 #                      BAM input, a single condition and three conditions
+# The test data are downloaded once per job by tests/fetch_test_data.sh (with retries and md5 check) and
+# used through -c test_data/local.config: Zenodo rate-limits shared runner IPs, and a refused request
+# would otherwise fail the parameter validation ("... does not exist").
 
 on:
   push:
@@ -67,20 +70,23 @@ jobs:
           docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:$PWD" -w "$PWD" \
             quay.io/biocontainers/bioconductor-isoformswitchanalyzer:2.6.0--r44h3df3fcb_0 sh tests/apa_unit/run_apa_unit_test.sh
 
+      - name: Download the test data from Zenodo (retries, md5 check)
+        run: sh tests/fetch_test_data.sh test_data
+
       - name: Stub run (-profile test,docker -stub)
-        run: nextflow run main.nf -profile test,docker -stub --outdir results_stub
+        run: nextflow run main.nf -profile test,docker -c test_data/local.config -stub --outdir results_stub
 
       - name: Stub run with SQANTI3 and a design covariate
         run: |
-          nextflow run main.nf -profile test,docker -stub --outdir results_stub_cov \
-            --samplesheet tests/samplesheet_test_covariates.csv --design '~ batch + condition' --run_sqanti3
+          nextflow run main.nf -profile test,docker -c test_data/local.config -stub --outdir results_stub_cov \
+            --samplesheet test_data/samplesheet_test_covariates.csv --design '~ batch + condition' --run_sqanti3
           test -s results_stub_cov/sqanti3/sqanti3_category_counts.tsv
           test -s results_stub_cov/suppa2/diffsplice/suppa2_diffsplice_significant.tsv
 
       - name: Stub run with relaxed sample/condition names and a numeric covariate
         run: |
-          nextflow run main.nf -profile test,docker -stub --outdir results_stub_names \
-            --samplesheet tests/samplesheet_test_names_numeric.csv --reference_condition ctrl-1 \
+          nextflow run main.nf -profile test,docker -c test_data/local.config -stub --outdir results_stub_names \
+            --samplesheet test_data/samplesheet_test_names_numeric.csv --reference_condition ctrl-1 \
             --design '~ rin + condition' --numeric_covariates rin
 
   test:
@@ -107,8 +113,11 @@ jobs:
         with:
           version: ${{ env.NXF_VER }}
 
+      - name: Download the test data from Zenodo (retries, md5 check)
+        run: sh tests/fetch_test_data.sh test_data
+
       - name: Run the test profile (FASTQ input)
-        run: nextflow run main.nf -profile test,docker --outdir results_test
+        run: nextflow run main.nf -profile test,docker -c test_data/local.config --outdir results_test
 
       # BAM input: the BAMs are placed outside the launch and work directories, so that every task must
       # reach them through the paths Nextflow mounts (no dangling symbolic links)
@@ -122,7 +131,7 @@ jobs:
             echo "$s,/tmp/nli_bam_inputs/$s.bam,$c" >> /tmp/nli_bam_inputs/samplesheet.csv
           done
           rm -rf work
-          nextflow run main.nf -profile test,docker -w /tmp/nli_work_bam --input_type bam \
+          nextflow run main.nf -profile test,docker -c test_data/local.config -w /tmp/nli_work_bam --input_type bam \
             --samplesheet /tmp/nli_bam_inputs/samplesheet.csv --outdir results_bam
           head -n 1 results_bam/bambu/counts_transcript.txt | grep -q GM12878_rep1
           for s in GM12878_rep1 GM12878_rep2 H1_rep1 H1_rep2; do test -s results_bam/junctions/$s.junctions.tsv; done
@@ -131,16 +140,16 @@ jobs:
 
       - name: Run the test profile (single condition, 2 replicates)
         run: |
-          nextflow run main.nf -profile test,docker -w /tmp/nli_work_single \
-            --samplesheet tests/samplesheet_test_single.csv --outdir results_single
+          nextflow run main.nf -profile test,docker -c test_data/local.config -w /tmp/nli_work_single \
+            --samplesheet test_data/samplesheet_test_single.csv --outdir results_single
           grep -q Message results_single/DE_genes/DE_results.csv
           grep -q Message results_single/isoswitch/significant_switches.csv
           rm -rf /tmp/nli_work_single
 
       - name: Run the test profile (three conditions, 2 replicates each)
         run: |
-          nextflow run main.nf -profile test,docker -w /tmp/nli_work_3cond \
-            --samplesheet tests/samplesheet_test_3cond.csv --outdir results_3cond
+          nextflow run main.nf -profile test,docker -c test_data/local.config -w /tmp/nli_work_3cond \
+            --samplesheet test_data/samplesheet_test_3cond.csv --outdir results_3cond
           for c in treatment other; do
             test -s results_3cond/DE_genes/DE_results_${c}_vs_control.csv
             test -s results_3cond/suppa2/diffsplice/${c}_vs_control.dpsi
